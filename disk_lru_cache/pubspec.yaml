@@ -1,0 +1,20 @@
+name: disk_lru_cache
+description: A starting point for Dart libraries or applications.
+version: 1.0.0
+# homepage: https://www.example.com
+
+environment:
+  sdk: '>=2.16.2 <3.0.0'
+
+dependencies:
+  logging: '>=1.0.2 <2.0.0'
+  synchronized: '>=3.0.0 <4.0.0'
+  file_system: any
+
+dependency_overrides: 
+  file_system:
+    path: ../file_system
+  
+dev_dependencies:
+  lints: ^1.0.1
+  test: ^1.21.1
