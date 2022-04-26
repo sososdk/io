@@ -5,8 +5,8 @@ import 'dart:typed_data';
 import 'package:file_system/file_system.dart';
 import 'package:meta/meta.dart';
 import 'package:path/path.dart';
-import 'package:synchronized/synchronized.dart';
 
+import 'lock.dart';
 import 'logger.dart';
 import 'lru_map.dart';
 import 'strict_line_reader.dart';
