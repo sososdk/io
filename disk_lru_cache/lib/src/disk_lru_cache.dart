@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:file_system/file_system.dart';
 import 'package:meta/meta.dart';
@@ -9,7 +7,6 @@ import 'package:path/path.dart';
 import 'lock.dart';
 import 'logger.dart';
 import 'lru_map.dart';
-import 'strict_line_reader.dart';
 
 /// A cache that uses a bounded amount of space on a filesystem. Each cache
 /// entry has a string key and a fixed number of values. Each key must match
@@ -133,7 +130,7 @@ class DiskLruCache {
 
   int _size = 0;
 
-  IOSink? _journalWriter;
+  BufferedSink? _journalWriter;
 
   int _redundantOpCount = 0;
   bool _hasJournalErrors = false;
@@ -191,7 +188,7 @@ class DiskLruCache {
           }
         } catch (e) {
           _mostRecentRebuildFailed = true;
-          _journalWriter = BlackHoleSink();
+          _journalWriter = BlackHoleSink().buffer();
         }
       });
 
@@ -240,12 +237,11 @@ class DiskLruCache {
     _assertLock();
 
     return fileSystem.read(journalFile, (source) async {
-      final reader = StrictLineReader(source);
-      final magic = await reader.readLine();
-      final version = await reader.readLine();
-      final appVersionString = await reader.readLine();
-      final valueCountString = await reader.readLine();
-      final blank = await reader.readLine();
+      final magic = await source.readLineStrict();
+      final version = await source.readLineStrict();
+      final appVersionString = await source.readLineStrict();
+      final valueCountString = await source.readLineStrict();
+      final blank = await source.readLineStrict();
       if (_kMagic != magic ||
           _kVersion != version ||
           appVersion.toString() != appVersionString ||
@@ -258,7 +254,7 @@ class DiskLruCache {
       var lineCount = 0;
       while (true) {
         try {
-          _readJournalLine(await reader.readLine());
+          _readJournalLine(await source.readLineStrict());
           lineCount++;
         } on EOFException {
           break; // End of journal.
@@ -267,7 +263,7 @@ class DiskLruCache {
       _redundantOpCount = lineCount - _lruEntries.length;
 
       // If we ended on a truncated line, rebuild the journal before appending to it.
-      if (reader.hasUnterminatedLine) {
+      if (!await source.exhausted()) {
         await _rebuildJournal();
       } else {
         _journalWriter = await _newJournalWriter();
@@ -275,12 +271,13 @@ class DiskLruCache {
     });
   }
 
-  Future<IOSink> _newJournalWriter() async {
+  Future<BufferedSink> _newJournalWriter() async {
     final fileSink = await fileSystem.sink(journalFile, mode: FileMode.append);
-    return FaultHidingSink(fileSink, () {
+    final faultHidingSink = FaultHidingSink(fileSink, () {
       _assertLock();
       _hasJournalErrors = true;
     });
+    return faultHidingSink.buffer();
   }
 
   void _readJournalLine(String line) {
@@ -348,18 +345,17 @@ class DiskLruCache {
   Future<void> _rebuildJournal() async {
     _assertLock();
     await _journalWriter?.close();
-    await fileSystem.write(journalFileTmp, (sink) {
-      sink
-        ..writeln(_kMagic)
-        ..writeln(_kVersion)
-        ..writeln('$appVersion')
-        ..writeln('$valueCount')
-        ..writeln();
+    await fileSystem.write(journalFileTmp, (sink) async {
+      await sink.writeLine(_kMagic);
+      await sink.writeLine(_kVersion);
+      await sink.writeLine('$appVersion');
+      await sink.writeLine('$valueCount');
+      await sink.writeLine();
       for (final entry in _lruEntries.values) {
         if (entry.currentEditor != null) {
-          sink.writeln('$_kDirty ${entry.key}');
+          await sink.writeLine('$_kDirty ${entry.key}');
         } else {
-          sink.writeln('$_kClean ${entry.key} ${entry.getLengths()}');
+          await sink.writeLine('$_kClean ${entry.key} ${entry.getLengths()}');
         }
       }
     });
@@ -390,7 +386,7 @@ class DiskLruCache {
         if (snapshot == null) return null;
 
         _redundantOpCount++;
-        _journalWriter!.writeln('$_kRead $key');
+        await _journalWriter!.writeLine('$_kRead $key');
         if (_journalRebuildRequired()) {
           _cleanup();
         }
@@ -431,7 +427,7 @@ class DiskLruCache {
         }
 
         // Flush the journal before creating files to prevent file leaks.
-        _journalWriter!.writeln('$_kDirty $key');
+        await _journalWriter!.writeLine('$_kDirty $key');
         await _journalWriter!.flush();
 
         if (_hasJournalErrors) {
@@ -499,13 +495,14 @@ class DiskLruCache {
     _redundantOpCount++;
     if (entry.readable || success) {
       entry.readable = true;
-      _journalWriter!.writeln('$_kClean ${entry.key} ${entry.getLengths()}');
+      await _journalWriter!
+          .writeLine('$_kClean ${entry.key} ${entry.getLengths()}');
       if (success) {
         entry.sequenceNumber = _nextSequenceNumber++;
       }
     } else {
       _lruEntries.remove(entry.key);
-      _journalWriter!.writeln('$_kRemove ${entry.key}');
+      await _journalWriter!.writeLine('$_kRemove ${entry.key}');
     }
     await _journalWriter!.flush();
 
@@ -548,7 +545,7 @@ class DiskLruCache {
     if (!_civilizedFileSystem) {
       if (entry.lockingSourceCount > 0) {
         // Mark this entry as 'DIRTY' so that if the process crashes this entry won't be used.
-        _journalWriter?.write('$_kDirty ${entry.key}');
+        await _journalWriter?.writeLine('$_kDirty ${entry.key}');
         await _journalWriter?.flush();
       }
       if (entry.lockingSourceCount > 0 || entry.currentEditor != null) {
@@ -567,7 +564,7 @@ class DiskLruCache {
     }
 
     _redundantOpCount++;
-    _journalWriter?.writeln('$_kRemove ${entry.key}');
+    await _journalWriter?.writeLine('$_kRemove ${entry.key}');
     _lruEntries.remove(entry.key);
 
     if (_journalRebuildRequired()) {
@@ -719,7 +716,9 @@ class Snapshot {
 
   Future<void> close() async {
     for (final source in sources) {
-      await source.close().catchError((_) {});
+      try {
+        await source.close();
+      } catch (_) {}
     }
   }
 }
@@ -773,21 +772,21 @@ class Editor {
   /// Returns a new unbuffered output stream to write the value at [index]. If
   /// the underlying output stream encounters errors when writing to the
   /// filesystem, this edit will be aborted when [commit] is called.
-  Future<IOSink> newSink(int index, {Encoding encoding = utf8}) {
+  Future<Sink> newSink(int index) {
     return _cache._lock.synchronized(() async {
       if (_done) throw StateError('editor was done');
       if (_entry.currentEditor != this) {
-        return BlackHoleSink(encoding: encoding);
+        return BlackHoleSink();
       }
       if (!_entry.readable) {
         _written![index] = true;
       }
       final dirtyFile = _entry.getDirtyFile(index);
-      final IOSink sink;
+      final Sink sink;
       try {
-        sink = await _cache.fileSystem.sink(dirtyFile, encoding: encoding);
+        sink = await _cache.fileSystem.sink(dirtyFile);
       } on FileSystemException {
-        return BlackHoleSink(encoding: encoding);
+        return BlackHoleSink();
       }
       return FaultHidingSink(
         sink,
@@ -905,7 +904,9 @@ class Entry {
     } on FileSystemException {
       // A file must have been deleted manually!
       for (final source in sources) {
-        await source.close().catchError((_) {});
+        try {
+          await source.close();
+        } catch (_) {}
       }
       // Since the entry is no longer valid, remove it so the metadata is
       // accurate (i.e. the cache size.)
@@ -921,7 +922,7 @@ class Entry {
     if (_cache._civilizedFileSystem) return source;
 
     lockingSourceCount++;
-    return _ForwardingSource(
+    return _Source(
         source,
         () => _cache._lock.synchronized(() async {
               lockingSourceCount--;
@@ -932,21 +933,17 @@ class Entry {
   }
 }
 
-class _ForwardingSource extends Source {
-  final Source delegate;
+class _Source extends ForwardingSource {
   final Future<void> Function() onClose;
-  var closed = false;
+  bool _closed = false;
 
-  _ForwardingSource(this.delegate, this.onClose);
-
-  @override
-  Future<Uint8List> read(int count) => delegate.read(count);
+  _Source(Source delegate, this.onClose) : super(delegate);
 
   @override
   Future close() async {
-    await delegate.close();
-    if (!closed) {
-      closed = true;
+    if (!_closed) {
+      _closed = true;
+      await delegate.close();
       await onClose();
     }
   }

@@ -1,44 +1,61 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:file/file.dart';
 import 'package:path/path.dart' as p;
 
-import 'source.dart';
+import 'io.dart';
 
 export 'package:file/file.dart';
 
 extension FileSystemShortcuts on FileSystem {
-  Future<IOSink> sink(
+  Future<Sink> sink(
     String path, {
     FileMode mode = FileMode.write,
-    Encoding encoding = utf8,
-  }) =>
-      file(path)
-          .create(recursive: true)
-          .then((e) => e.openWrite(mode: mode, encoding: encoding));
+  }) {
+    if (mode != FileMode.write &&
+        mode != FileMode.append &&
+        mode != FileMode.writeOnly &&
+        mode != FileMode.writeOnlyAppend) {
+      throw ArgumentError('Invalid file mode for this operation');
+    }
+    return file(path)
+        .create(recursive: true)
+        .then((e) async => FileSink(await e.open(mode: mode)));
+  }
 
-  Future<T> write<T>(String path, FutureOr<T> Function(IOSink sink) block,
-          {Encoding encoding = utf8}) =>
-      sink(path, mode: FileMode.write, encoding: encoding).then((e) async {
+  Future<T> write<T>(
+    String path,
+    FutureOr<T> Function(BufferedSink sink) block,
+  ) {
+    return sink(path, mode: FileMode.write).buffer().then((e) async {
+      try {
+        return await block(e);
+      } finally {
         try {
-          return await block(e);
-        } finally {
-          await e.close().catchError((_) {});
-        }
-      });
+          await e.close();
+        } catch (_) {}
+      }
+    });
+  }
 
-  Future<Source> source(String path) => file(path).source();
+  Future<Source> source(String path) {
+    return file(path).open().then((e) => FileSource(e));
+  }
 
-  Future<T> read<T>(String path, FutureOr<T> Function(Source source) block) =>
-      source(path).then((e) async {
+  Future<T> read<T>(
+    String path,
+    FutureOr<T> Function(BufferedSource source) block,
+  ) {
+    return source(path).buffer().then((e) async {
+      try {
+        return await block(e);
+      } finally {
         try {
-          return await block(e);
-        } finally {
-          await e.close().catchError((_) {});
-        }
-      });
+          await e.close();
+        } catch (_) {}
+      }
+    });
+  }
 
   Future<bool> exists(String path) => type(path, followLinks: false)
       .then((value) => value != FileSystemEntityType.notFound);
@@ -127,7 +144,9 @@ extension FileSystemShortcuts on FileSystem {
           return true;
         } catch (_) {
         } finally {
-          await e.close().catchError((_) {});
+          try {
+            await e.close();
+          } catch (_) {}
         }
         return false;
       }).whenComplete(() async {
@@ -137,20 +156,4 @@ extension FileSystemShortcuts on FileSystem {
 
 extension FileSystemEntityShortcuts on FileSystemEntity {
   String get absolutePath => isAbsolute ? path : absolute.path;
-}
-
-extension FileShortcuts on File {
-  Future<Source> source() => open().then((value) => _FileSource(value));
-}
-
-class _FileSource extends Source {
-  final RandomAccessFile file;
-
-  _FileSource(this.file);
-
-  @override
-  Future<Uint8List> read(int count) => file.read(count);
-
-  @override
-  Future close() => file.close();
 }

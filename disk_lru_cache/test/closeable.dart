@@ -1,7 +1,7 @@
 import 'dart:async';
 
 extension ClosableExtension<T extends dynamic> on T {
-  Future<R> use<R>(FutureOr<R> block(T closable)) async {
+  Future<R> use<R>(FutureOr<R> Function(T closable) block) async {
     try {
       return await block(this);
     } finally {
@@ -13,7 +13,8 @@ extension ClosableExtension<T extends dynamic> on T {
 }
 
 extension FutureClosableExtension<T extends dynamic> on Future<T> {
-  Future<R> use<R>(FutureOr<R> block(T closable)) => then((closable) async {
+  Future<R> use<R>(FutureOr<R> Function(T closable) block) =>
+      then((closable) async {
         try {
           return await block(closable);
         } finally {

@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:disk_lru_cache/disk_lru_cache.dart';
@@ -34,7 +35,9 @@ Future<void> main() async {
   }
 
   Future<List<String>> readJournalLines() {
-    return fileSystem.read(journalFile, (source) => source.readAsLines());
+    return fileSystem.read(journalFile, (source) async {
+      return const LineSplitter().convert(await source.readString());
+    });
   }
 
   Future<void> assertJournalEquals(
@@ -57,15 +60,14 @@ Future<void> main() async {
     String blank,
     List<String> bodyLines,
   ) {
-    return fileSystem.write(journalFile, (sink) {
-      sink
-        ..writeln(magic)
-        ..writeln(version)
-        ..writeln(appVersion)
-        ..writeln(valueCount)
-        ..writeln(blank);
+    return fileSystem.write(journalFile, (sink) async {
+      await sink.writeLine(magic);
+      await sink.writeLine(version);
+      await sink.writeLine(appVersion);
+      await sink.writeLine(valueCount);
+      await sink.writeLine(blank);
       for (final line in bodyLines) {
-        sink.writeln(line);
+        await sink.writeLine(line);
       }
     });
   }
@@ -80,14 +82,14 @@ Future<void> main() async {
   String getDirtyFile(String key, int index) => '$cacheDir/$key.$index.tmp';
 
   Future<String> readFile(String path) =>
-      fileSystem.read(path, (source) => source.readAsString());
+      fileSystem.read(path, (source) => source.readString());
 
   Future<String?> readFileOrNull(String path) => fileSystem
-      .read<String?>(path, (source) => source.readAsString())
+      .read<String?>(path, (source) => source.readString())
       .catchError((e) => null);
 
   Future<void> writeFile(String path, String content) =>
-      fileSystem.write(path, (sink) => sink.write(content));
+      fileSystem.write(path, (sink) => sink.writeString(content));
 
   Future<void> generateSomeGarbageFiles() async {
     final dir1 = '$cacheDir/dir1';
@@ -168,7 +170,10 @@ Future<void> main() async {
     // attempt to delete the file. Do not explicitly close the cache here so the entry is left as
     // incomplete.
     final creator = await cache.edit('k1').then((value) => value!);
-    await creator.newSink(0).then((value) => value.write('Hello'));
+    await creator
+        .newSink(0)
+        .buffer()
+        .then((value) => value.writeString('Hello'));
 
     // Simulate a severe Filesystem failure on the first initialization.
     fileSystem.setFaulty('$cacheDir/k1.0.tmp', true);
@@ -371,9 +376,9 @@ Future<void> main() async {
     await v1Creator.commit();
 
     final snapshot1 = await cache.get('k1').then((value) => value!);
-    final inV1 = snapshot1.getSource(0);
-    expect(await inV1.read(1).then((value) => value.first), 'A'.codeUnitAt(0));
-    expect(await inV1.read(1).then((value) => value.first), 'A'.codeUnitAt(0));
+    final inV1 = snapshot1.getSource(0).buffer();
+    expect(await inV1.readInt8(), 'A'.codeUnitAt(0));
+    expect(await inV1.readInt8(), 'A'.codeUnitAt(0));
 
     final v1Updater = await cache.edit('k1').then((value) => value!);
     await v1Updater.setString(0, 'CCcc');
@@ -385,8 +390,8 @@ Future<void> main() async {
     await snapshot2.assertValue(1, 'DDdd');
     await snapshot2.close();
 
-    expect(await inV1.read(1).then((value) => value.first), 'a'.codeUnitAt(0));
-    expect(await inV1.read(1).then((value) => value.first), 'a'.codeUnitAt(0));
+    expect(await inV1.readInt8(), 'a'.codeUnitAt(0));
+    expect(await inV1.readInt8(), 'a'.codeUnitAt(0));
     await snapshot1.close();
   });
 
@@ -458,14 +463,13 @@ Future<void> main() async {
     await cache.close();
     await writeFile(getCleanFile('k1', 0), 'A');
     await writeFile(getCleanFile('k1', 1), 'B');
-    await fileSystem.write(journalFile, (sink) {
-      sink
-        ..writeln(magic)
-        ..writeln(version)
-        ..writeln(appVersion)
-        ..writeln(valueCount)
-        ..writeln()
-        ..write('CLEAN k1 1 1');
+    await fileSystem.write(journalFile, (sink) async {
+      await sink.writeLine(magic);
+      await sink.writeLine('$version');
+      await sink.writeLine('$appVersion');
+      await sink.writeLine('$valueCount');
+      await sink.writeLine();
+      await sink.writeString('CLEAN k1 1 1');
     });
     await createNewCache();
     expect(await cache.get('k1'), isNull);
@@ -1266,10 +1270,10 @@ Future<void> main() async {
 
     // Create an editor, then detach it.
     final editor = await cache.edit('k1').then((value) => value!);
-    await editor.newSink(0).use((closable) async {
+    await editor.newSink(0).buffer().use((closable) async {
       await cache.evictAll();
       // Complete the original edit. It goes into a black hole.
-      closable.write('bb');
+      closable.writeString('bb');
     });
     expect(await cache.get('k1'), isNull);
   });
@@ -1279,14 +1283,14 @@ Future<void> main() async {
 
     // Create an editor, then detach it.
     final editor = await cache.edit('k1').then((value) => value!);
-    await editor.newSink(0).use((closable) async {
+    await editor.newSink(0).buffer().use((closable) async {
       await cache.evictAll();
 
       // Create another value in its place.
       await set('k1', 'ccc', 'ccc');
 
       // Complete the original edit. It goes into a black hole.
-      closable.write('bb');
+      closable.writeString('bb');
     });
     await assertValue('k1', 'ccc', 'ccc');
   });
@@ -1518,7 +1522,7 @@ class FaultyFileSystem extends ForwardingFileSystem {
 
 extension EditorShortcuts on Editor {
   Future<void> setString(int index, String value) =>
-      newSink(index).use((sink) => sink.write(value));
+      newSink(index).buffer().use((sink) => sink.writeString(value));
 
   Future<void> assertInoperable() async {
     try {
@@ -1542,7 +1546,7 @@ extension EditorShortcuts on Editor {
 extension SnapshotShortcuts on Snapshot {
   Future<void> assertValue(int index, String value) async {
     expect(
-      await getSource(index).use((source) => source.readAsString()),
+      await getSource(index).buffer().use((source) => source.readString()),
       value,
     );
   }
