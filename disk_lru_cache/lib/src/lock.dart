@@ -30,7 +30,7 @@ class Lock {
     } finally {
       // Cleanup.
       // waiting for the previous task to be done in case of timeout.
-      void _complete() {
+      void complete() {
         // Only mark it unlocked when the last one complete.
         if (identical(last, completer.future)) {
           last = null;
@@ -45,10 +45,10 @@ class Lock {
         // But we still returns immediately.
         // ignore: unawaited_futures
         prev.then((_) {
-          _complete();
+          complete();
         });
       } else {
-        _complete();
+        complete();
       }
     }
   }

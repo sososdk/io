@@ -3,8 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:disk_lru_cache/disk_lru_cache.dart';
-import 'package:file/local.dart';
-import 'package:file/src/io.dart' as io;
 import 'package:file_system/file_system.dart';
 import 'package:test/test.dart';
 
@@ -1512,7 +1510,7 @@ class FaultyFileSystem extends ForwardingFileSystem {
   }
 
   @override
-  Future<io.FileSystemEntityType> type(String path, {bool followLinks = true}) {
+  Future<FileSystemEntityType> type(String path, {bool followLinks = true}) {
     if (faults.contains(path) || faults.contains(path)) {
       throw StateError("boom!");
     }

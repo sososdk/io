@@ -8,6 +8,8 @@ environment:
 
 dependencies:
   logging: '>=1.0.2 <2.0.0'
+  path: '>=1.8.0 <2.0.0'
+  meta: '>=1.7.0 <2.0.0'
   file_system: any
 
 dependency_overrides: 
@@ -15,5 +17,5 @@ dependency_overrides:
     path: ../file_system
   
 dev_dependencies:
-  lints: ^1.0.1
+  lints: ^2.0.0
   test: ^1.21.1
