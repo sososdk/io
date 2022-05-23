@@ -13,6 +13,31 @@ abstract class Source {
 
 extension SourceBuffer on Source {
   BufferedSource buffer() => RealBufferedSource(this);
+
+  /// Attempts to exhaust this, returning true if successful. This is useful when reading a complete
+  /// source is helpful, such as when doing so completes a cache body or frees a socket connection for
+  /// reuse.
+  FutureOr<bool> discard([
+    Duration timeout = const Duration(milliseconds: 100),
+  ]) async {
+    try {
+      final skip = skipAll();
+      if (skip is Future) {
+        await skip.timeout(timeout);
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Reads until this is exhausted.
+  FutureOr<void> skipAll() async {
+    final skipBuffer = Buffer();
+    while (await read(skipBuffer, kBlockSize) != 0) {
+      skipBuffer.clear();
+    }
+  }
 }
 
 extension FutureSourceBuffer on Future<Source> {
@@ -126,12 +151,14 @@ class ForwardingSource extends Source {
 }
 
 class FileSource extends Source {
-  final RandomAccessFile file;
-
   FileSource(this.file);
+
+  final RandomAccessFile file;
+  bool _closed = false;
 
   @override
   Future<int> read(Buffer sink, int count) {
+    assert(!_closed);
     return file.read(count).then((e) {
       if (e.isNotEmpty) sink.writeBytes(e);
       return e.length;
@@ -139,7 +166,71 @@ class FileSource extends Source {
   }
 
   @override
-  Future close() => file.close();
+  Future<void> close() async {
+    if (_closed) return;
+    _closed = true;
+    await file.close();
+  }
+}
+
+class StreamSource extends Source {
+  StreamSource(this.stream) {
+    _subscription = stream.listen(
+      (event) {
+        _subscription.pause();
+        try {
+          _receiveBuffer.writeBytes(event);
+          _completer?.complete();
+        } catch (error, stackTrace) {
+          _subscription
+              .cancel()
+              .whenComplete(() => _completer?.completeError(error, stackTrace));
+        }
+      },
+      onError: (error, stackTrace) {
+        _completer?.completeError(error, stackTrace);
+      },
+      onDone: () {
+        _done = true;
+        _completer?.complete();
+      },
+      cancelOnError: true,
+    );
+  }
+
+  final _receiveBuffer = Buffer();
+  final Stream<List<int>> stream;
+  late StreamSubscription<List<int>> _subscription;
+  Completer? _completer;
+  bool _done = false;
+  bool _closed = false;
+
+  @override
+  Future<int> read(Buffer sink, int count) async {
+    assert(!_closed);
+    _subscription.resume();
+    while (_receiveBuffer.isEmpty) {
+      if (_done) {
+        return 0;
+      }
+      final completer = _completer = Completer();
+      await completer.future;
+      _completer = null;
+    }
+    final length = min(count, _receiveBuffer.length);
+    sink.write(_receiveBuffer, length);
+    return length;
+  }
+
+  @override
+  Future<void> close() async {
+    if (_closed) return;
+    _closed = true;
+    await _subscription.cancel();
+    try {
+      _completer?.completeError('StreamSource closed.');
+    } catch (_) {}
+  }
 }
 
 class RealBufferedSource extends BufferedSource {

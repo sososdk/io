@@ -331,6 +331,19 @@ class Buffer implements BufferedSource, BufferedSink {
     return sink;
   }
 
+  void copyTo(Buffer buffer, [int start = 0, int? end]) {
+    end = RangeError.checkValidRange(start, end, _length);
+    for (var chunk in _chunks) {
+      if (start + chunk.length > end) {
+        buffer.writeBytes(chunk.sublist(start, end));
+        break;
+      } else {
+        buffer.writeBytes(chunk);
+        start += chunk.length;
+      }
+    }
+  }
+
   @override
   void emit() {}
 

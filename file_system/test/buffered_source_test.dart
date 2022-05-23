@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:file/memory.dart';
 import 'package:file_system/file_system.dart';
 import 'package:test/test.dart';
 
@@ -154,6 +153,20 @@ void main() {
       expect(buffer.exhausted(), false);
       expect(buffer.readLine(), 'hello3\r');
       expect(buffer.exhausted(), true);
+    });
+
+    test('copy to', () {
+      final buffer = Buffer();
+      buffer.writeString('hello\nhello2\r\nhello3\r');
+
+      final buffer2 = Buffer();
+      buffer.copyTo(buffer2, 2, 6);
+
+      expect(buffer2.readLineStrict(), 'llo');
+      expect(buffer2.exhausted(), true);
+
+      buffer.copyTo(buffer2, 14);
+      expect(buffer2.readLine(), 'hello3\r');
     });
   });
 

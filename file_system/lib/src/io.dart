@@ -13,4 +13,4 @@ const int kLF = 10; // \n
 const int kCR = 13; // \r
 const int kBlockSize = 8192;
 
-class EOFException implements Exception {}
+class EOFException implements IOException {}
