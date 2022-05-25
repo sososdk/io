@@ -168,6 +168,106 @@ void main() {
       buffer.copyTo(buffer2, 14);
       expect(buffer2.readLine(), 'hello3\r');
     });
+
+    test('copy to 2', () {
+      final buffer = Buffer();
+      buffer.writeBytes(List.generate(4, (index) => 0 + index));
+      buffer.writeBytes(List.generate(4, (index) => 4 + index));
+      buffer.writeBytes(List.generate(4, (index) => 8 + index));
+      buffer.writeBytes(List.generate(4, (index) => 12 + index));
+      buffer.writeBytes(List.generate(4, (index) => 16 + index));
+      buffer.writeBytes(List.generate(4, (index) => 20 + index));
+      buffer.writeBytes(List.generate(4, (index) => 24 + index));
+
+      final buffer2 = Buffer();
+      buffer.copyTo(buffer2, 0, 0);
+      expect(buffer2.readBytes().toString(), '[]');
+      buffer.copyTo(buffer2, 0, 1);
+      expect(buffer2.readBytes().toString(), '[0]');
+      buffer.copyTo(buffer2, 0, 2);
+      expect(buffer2.readBytes().toString(), '[0, 1]');
+      buffer.copyTo(buffer2, 0, 3);
+      expect(buffer2.readBytes().toString(), '[0, 1, 2]');
+      buffer.copyTo(buffer2, 0, 4);
+      expect(buffer2.readBytes().toString(), '[0, 1, 2, 3]');
+      buffer.copyTo(buffer2, 0, 5);
+      expect(buffer2.readBytes().toString(), '[0, 1, 2, 3, 4]');
+
+      buffer.copyTo(buffer2, 2, 2);
+      expect(buffer2.readBytes().toString(), '[]');
+      buffer.copyTo(buffer2, 2, 3);
+      expect(buffer2.readBytes().toString(), '[2]');
+      buffer.copyTo(buffer2, 2, 4);
+      expect(buffer2.readBytes().toString(), '[2, 3]');
+      buffer.copyTo(buffer2, 2, 5);
+      expect(buffer2.readBytes().toString(), '[2, 3, 4]');
+      buffer.copyTo(buffer2, 2, 6);
+      expect(buffer2.readBytes().toString(), '[2, 3, 4, 5]');
+      buffer.copyTo(buffer2, 2, 7);
+      expect(buffer2.readBytes().toString(), '[2, 3, 4, 5, 6]');
+
+      buffer.copyTo(buffer2, 3, 3);
+      expect(buffer2.readBytes().toString(), '[]');
+      buffer.copyTo(buffer2, 3, 4);
+      expect(buffer2.readBytes().toString(), '[3]');
+      buffer.copyTo(buffer2, 3, 5);
+      expect(buffer2.readBytes().toString(), '[3, 4]');
+      buffer.copyTo(buffer2, 3, 6);
+      expect(buffer2.readBytes().toString(), '[3, 4, 5]');
+      buffer.copyTo(buffer2, 3, 7);
+      expect(buffer2.readBytes().toString(), '[3, 4, 5, 6]');
+      buffer.copyTo(buffer2, 3, 8);
+      expect(buffer2.readBytes().toString(), '[3, 4, 5, 6, 7]');
+
+      buffer.copyTo(buffer2, 4, 4);
+      expect(buffer2.readBytes().toString(), '[]');
+      buffer.copyTo(buffer2, 4, 5);
+      expect(buffer2.readBytes().toString(), '[4]');
+      buffer.copyTo(buffer2, 4, 6);
+      expect(buffer2.readBytes().toString(), '[4, 5]');
+      buffer.copyTo(buffer2, 4, 7);
+      expect(buffer2.readBytes().toString(), '[4, 5, 6]');
+      buffer.copyTo(buffer2, 4, 8);
+      expect(buffer2.readBytes().toString(), '[4, 5, 6, 7]');
+      buffer.copyTo(buffer2, 4, 9);
+      expect(buffer2.readBytes().toString(), '[4, 5, 6, 7, 8]');
+      buffer.copyTo(buffer2, 4, 10);
+      expect(buffer2.readBytes().toString(), '[4, 5, 6, 7, 8, 9]');
+
+      buffer.copyTo(buffer2, 5, 5);
+      expect(buffer2.readBytes().toString(), '[]');
+      buffer.copyTo(buffer2, 5, 6);
+      expect(buffer2.readBytes().toString(), '[5]');
+      buffer.copyTo(buffer2, 5, 7);
+      expect(buffer2.readBytes().toString(), '[5, 6]');
+      buffer.copyTo(buffer2, 5, 8);
+      expect(buffer2.readBytes().toString(), '[5, 6, 7]');
+      buffer.copyTo(buffer2, 5, 9);
+      expect(buffer2.readBytes().toString(), '[5, 6, 7, 8]');
+      buffer.copyTo(buffer2, 5, 10);
+      expect(buffer2.readBytes().toString(), '[5, 6, 7, 8, 9]');
+
+      buffer.copyTo(buffer2, 6, 6);
+      expect(buffer2.readBytes().toString(), '[]');
+      buffer.copyTo(buffer2, 6, 7);
+      expect(buffer2.readBytes().toString(), '[6]');
+      buffer.copyTo(buffer2, 6, 8);
+      expect(buffer2.readBytes().toString(), '[6, 7]');
+      buffer.copyTo(buffer2, 6, 9);
+      expect(buffer2.readBytes().toString(), '[6, 7, 8]');
+      buffer.copyTo(buffer2, 6, 10);
+      expect(buffer2.readBytes().toString(), '[6, 7, 8, 9]');
+      buffer.copyTo(buffer2, 6, 11);
+      expect(buffer2.readBytes().toString(), '[6, 7, 8, 9, 10]');
+
+      buffer.copyTo(buffer2, 5, 17);
+      expect(buffer2.readBytes().toString(),
+          '[5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]');
+
+      buffer.copyTo(buffer2, 15);
+      expect(buffer2.readBytes().toString(),
+          '[15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]');
+    });
   });
 
   group('sink and source', () {
