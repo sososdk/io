@@ -2,14 +2,14 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:disk_lru_cache/disk_lru_cache.dart';
+import 'package:disk_cache/disk_cache.dart';
 import 'package:file_system/file_system.dart';
 import 'package:test/test.dart';
 
 import 'closeable.dart';
 
 Future<void> main() async {
-  final magic = 'so.io.DiskLruCache';
+  final magic = 'so.io.DiskCache';
   final version = 1;
   final appVersion = 1;
   final valueCount = 2;
@@ -17,11 +17,11 @@ Future<void> main() async {
   final journalFile = 'build/cache/journal';
   final journalBkpFile = 'build/cache/journal.bkp';
   final fileSystem = FaultyFileSystem(const LocalFileSystem());
-  final toClose = ListQueue<DiskLruCache>();
-  late DiskLruCache cache;
+  final toClose = ListQueue<DiskCache>();
+  late DiskCache cache;
 
   Future<void> createNewCacheWithSize(int? maxSize) async {
-    cache = DiskLruCache(fileSystem, cacheDir,
+    cache = DiskCache(fileSystem, cacheDir,
         appVersion: appVersion, valueCount: valueCount, maxSize: maxSize);
     await cache.initialize();
     toClose.add(cache);
@@ -176,7 +176,7 @@ Future<void> main() async {
     // Simulate a severe Filesystem failure on the first initialization.
     fileSystem.setFaulty('$cacheDir/k1.0.tmp', true);
     fileSystem.setFaulty(cacheDir, true);
-    cache = DiskLruCache(fileSystem, cacheDir,
+    cache = DiskCache(fileSystem, cacheDir,
         appVersion: appVersion, valueCount: valueCount);
 
     await cache.get('k1').catchError((e) {});
@@ -670,7 +670,7 @@ Future<void> main() async {
 
   test('constructor does not allow zero cache size', () async {
     try {
-      DiskLruCache(fileSystem, cacheDir,
+      DiskCache(fileSystem, cacheDir,
           appVersion: appVersion, valueCount: valueCount, maxSize: 0);
       expect(0, 1);
     } catch (_) {}
@@ -678,7 +678,7 @@ Future<void> main() async {
 
   test('constructor does not allow zero values per entry', () async {
     try {
-      DiskLruCache(fileSystem, cacheDir,
+      DiskCache(fileSystem, cacheDir,
           appVersion: appVersion, valueCount: 0, maxSize: 10);
       expect(0, 1);
     } catch (_) {}
@@ -890,7 +890,7 @@ Future<void> main() async {
   test('open creates directory if necessary', () async {
     await cache.close();
     final dir = '$cacheDir/testOpenCreatesDirectoryIfNecessary';
-    cache = DiskLruCache(fileSystem, dir,
+    cache = DiskCache(fileSystem, dir,
         appVersion: appVersion, valueCount: valueCount);
     await set('a', 'a', 'a');
     expect(await fileSystem.exists('$dir/a.0'), isTrue);
@@ -1109,7 +1109,7 @@ Future<void> main() async {
 
   test('is closed uninitialized cache', () async {
     // Create an uninitialized cache.
-    cache = DiskLruCache(fileSystem, cacheDir,
+    cache = DiskCache(fileSystem, cacheDir,
         appVersion: appVersion, valueCount: valueCount);
     toClose.add(cache);
 

@@ -1,5 +1,5 @@
-name: disk_lru_cache
-description: A starting point for Dart libraries or applications.
+name: disk_cache
+description: Disk lru cache for dart.
 version: 1.0.0
 # homepage: https://www.example.com
 

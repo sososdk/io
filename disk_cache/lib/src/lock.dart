@@ -1,16 +1,24 @@
 import 'dart:async';
 
 /// Object providing the implicit lock.
-///
-/// if [timeout] is not null, it will timeout after the specified duration.
 class Lock {
   /// The last running block.
   Future<dynamic>? last;
 
+  /// returns true if the lock is currently locked.
   bool get locked => last != null;
 
-  Future<T> synchronized<T>(FutureOr<T> Function() func,
-      {Duration? timeout}) async {
+  /// Test whether we are currently in the synchronized section.
+  bool get inLock => Zone.current[this] ?? false;
+
+  /// Executes [computation] when lock is available.
+  ///
+  /// Only one asynchronous block can run while the lock is retained. if
+  /// [timeout] is not null, it will timeout after the specified duration.
+  Future<T> synchronized<T>(
+    FutureOr<T> Function() computation, {
+    Duration? timeout,
+  }) async {
     final prev = last;
     final completer = Completer.sync();
     last = completer.future;
@@ -26,7 +34,7 @@ class Lock {
       }
 
       // Run the function and return the result.
-      return await runZoned(() => func(), zoneValues: {this: true});
+      return await runZoned(() => computation(), zoneValues: {this: true});
     } finally {
       // Cleanup.
       // waiting for the previous task to be done in case of timeout.
@@ -43,10 +51,7 @@ class Lock {
 
       if (prev != null && timeout != null) {
         // But we still returns immediately.
-        // ignore: unawaited_futures
-        prev.then((_) {
-          complete();
-        });
+        unawaited(prev.then((_) => complete()));
       } else {
         complete();
       }
@@ -55,6 +60,4 @@ class Lock {
 
   @override
   String toString() => 'Lock[${identityHashCode(this)}]';
-
-  bool get inLock => Zone.current[this] ?? false;
 }

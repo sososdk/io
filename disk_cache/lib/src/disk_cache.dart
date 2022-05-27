@@ -44,7 +44,7 @@ import 'lru_map.dart';
 /// This class is tolerant of some I/O errors. If files are missing from the
 /// filesystem, the corresponding entries will be dropped from the cache. If an
 /// error occurs while writing a cache value, the edit will fail silently.
-class DiskLruCache {
+class DiskCache {
   /// 操作的记录文件名
   static const _kJournalFile = 'journal';
 
@@ -55,7 +55,7 @@ class DiskLruCache {
   static const _kJournalFileBackup = 'journal.bkp';
 
   /// 标识
-  static const _kMagic = 'so.io.DiskLruCache';
+  static const _kMagic = 'so.io.DiskCache';
 
   /// 版本
   static const _kVersion = "1";
@@ -85,7 +85,7 @@ class DiskLruCache {
 
   // This cache uses a journal file named "journal". A typical journal file looks like this:
   //
-  //     so.io.DiskLruCache
+  //     so.io.DiskCache
   //     1
   //     100
   //     2
@@ -100,7 +100,7 @@ class DiskLruCache {
   //     READ 3400330d1dfc7f3f7f4b8d4d803dfcf6
   //
   // The first five lines of the journal form its header. They are the constant string
-  // "so.io.DiskLruCache", the disk cache's version, the application's version, the value
+  // "so.io.DiskCache", the disk cache's version, the application's version, the value
   // count, and a blank line.
   //
   // Each of the subsequent lines in the file is a record of the state of a cache entry. Each line
@@ -147,7 +147,7 @@ class DiskLruCache {
   /// sequence number is not equal to its entry's sequence number.
   int _nextSequenceNumber = 0;
 
-  DiskLruCache(
+  DiskCache(
     this.fileSystem,
     this.directory, {
     this.appVersion = 1,
@@ -221,7 +221,7 @@ class DiskLruCache {
         _initialized = true;
         return;
       } catch (e, s) {
-        logger.warning('DiskLruCache $directory is corrupted, removing', e, s);
+        logger.warning('DiskCache $directory is corrupted, removing', e, s);
       }
 
       // The cache is corrupted, attempt to delete the contents of the directory. This can throw and
@@ -689,7 +689,7 @@ class DiskLruCache {
 
 /// A snapshot of the values for an entry.
 class Snapshot {
-  final DiskLruCache _cache;
+  final DiskCache _cache;
   final String key;
   final int sequenceNumber;
   final List<Source> sources;
@@ -725,7 +725,7 @@ class Snapshot {
 
 /// Edits the values for an entry.
 class Editor {
-  final DiskLruCache _cache;
+  final DiskCache _cache;
   final Entry _entry;
   final List<bool>? _written;
   bool _done = false;
@@ -835,7 +835,7 @@ class Entry {
   /// The key used to identify the object in the cache.
   final String key;
 
-  final DiskLruCache _cache;
+  final DiskCache _cache;
 
   FileSystem get fileSystem => _cache.fileSystem;
 

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:disk_lru_cache/src/lock.dart';
+import 'package:disk_cache/src/lock.dart';
 import 'package:test/test.dart';
 
 void main() {
