@@ -9,15 +9,9 @@ environment:
 dependencies:
   crypto: '>=3.0.2 <4.0.0'
   pool: '>=1.5.0 <2.0.0'
-  file_system: any
-  disk_cache: any
+  file_system: ^1.0.0
+  disk_cache: ^1.0.0
 
-dependency_overrides:
-  file_system:
-    path: ../file_system
-  disk_cache:
-    path: ../disk_cache
-    
 dev_dependencies:
   lints: ^2.0.0
   test: ^1.21.1

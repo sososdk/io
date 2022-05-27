@@ -10,12 +10,8 @@ dependencies:
   logging: '>=1.0.2 <2.0.0'
   path: '>=1.8.0 <2.0.0'
   meta: '>=1.7.0 <2.0.0'
-  file_system: any
+  file_system: ^1.0.0
 
-dependency_overrides: 
-  file_system:
-    path: ../file_system
-  
 dev_dependencies:
   lints: ^2.0.0
   test: ^1.21.1
