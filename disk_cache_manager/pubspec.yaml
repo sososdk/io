@@ -1,0 +1,26 @@
+name: disk_cache_manager
+description: Disk cache manager for dart.
+version: 1.0.0
+# homepage: https://www.example.com
+
+environment:
+  sdk: '>=2.16.2 <3.0.0'
+
+dependencies:
+  crypto: '>=3.0.2 <4.0.0'
+  pool: '>=1.5.0 <2.0.0'
+  file_system: any
+  disk_cache: any
+
+dependency_overrides:
+  file_system:
+    path: ../file_system
+  disk_cache:
+    path: ../disk_cache
+    
+dev_dependencies:
+  lints: ^2.0.0
+  test: ^1.21.1
+  file: ^6.1.2
+  http: ^0.13.4
+  dio: ^4.0.6
