@@ -31,6 +31,19 @@ class DiskCacheManager {
   final _fetching = <String, _FetchingCompleter>{};
   bool _closed = false;
 
+  Future<void> cache(
+    String url, {
+    Options options = const Options(),
+    ProgressCallback? downloadProgress,
+  }) {
+    return get(
+      url,
+      options: options,
+      downloadProgress: downloadProgress,
+      transformer: const TransparentTransformer(),
+    );
+  }
+
   Future<T> get<T>(
     String url, {
     Options options = const Options(),
@@ -79,7 +92,7 @@ class DiskCacheManager {
         await snapshot.close().catchError((_) {});
       }
     }
-    var resource = await _pool.request();
+    final resource = await _pool.request();
     try {
       final response = await _fetcher.fetch(url, options: options);
       final editor = await _cache.edit(key);
@@ -218,6 +231,18 @@ class Options {
 
 abstract class Transformer<S, T> {
   FutureOr<T> transform(S value);
+}
+
+class TransparentTransformer implements Transformer<CacheResponse, void> {
+  const TransparentTransformer();
+
+  @override
+  FutureOr<void> transform(CacheResponse response) {
+    final body = response.body;
+    if (body is _ReceivedSource) {
+      return body.skipAll();
+    }
+  }
 }
 
 typedef ProgressCallback = void Function(double percent);
