@@ -1,4 +1,4 @@
-part of 'io.dart';
+part of 'anio.dart';
 
 abstract class Sink {
   /// Removes [count] bytes from [source] and appends them to this.

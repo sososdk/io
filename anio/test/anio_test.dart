@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:file_system/file_system.dart';
+import 'package:anio/anio.dart';
+import 'package:file/file.dart';
+import 'package:file/memory.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -130,13 +132,19 @@ void main() {
       buffer.writeString('hello');
       buffer.writeCharCode('0'.codeUnitAt(0));
       final fileSystem = MemoryFileSystem();
-      await fileSystem.sink('/test').buffer().then((e) async {
+      await fileSystem
+          .file('/test')
+          .create(recursive: true)
+          .then((e) async => FileSink(await e.open(mode: FileMode.write)))
+          .buffer()
+          .then((e) async {
         await e.writeLine('hello');
         await e.writeString('hello2\r\n');
         await e.writeString('hello3\r');
         await e.close();
       });
-      final source = await fileSystem.source('/test');
+      final source =
+          await fileSystem.file('/test').open().then((e) => FileSource(e));
       await buffer.writeSource(source);
 
       expect(buffer.readInt8(), 1);
@@ -273,7 +281,12 @@ void main() {
   group('sink and source', () {
     test('read', () async {
       final fileSystem = MemoryFileSystem();
-      await fileSystem.sink('/test').buffer().then((e) async {
+      await fileSystem
+          .file('/test')
+          .create(recursive: true)
+          .then((e) async => FileSink(await e.open(mode: FileMode.write)))
+          .buffer()
+          .then((e) async {
         await e.writeInt8(1);
         await e.writeInt16(2, Endian.little);
         await e.writeInt32(3);
@@ -290,7 +303,11 @@ void main() {
         await e.close();
       });
 
-      final source = await fileSystem.source('/test').buffer();
+      final source = await fileSystem
+          .file('/test')
+          .open()
+          .then((e) => FileSource(e))
+          .buffer();
       expect(await source.readInt8(), 1);
       expect(await source.readInt16(Endian.little), 2);
       expect(await source.readInt32(), 3);

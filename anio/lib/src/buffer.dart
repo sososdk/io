@@ -1,4 +1,4 @@
-part of 'io.dart';
+part of 'anio.dart';
 
 /// A collection of bytes in memory.
 class Buffer implements BufferedSource, BufferedSink {

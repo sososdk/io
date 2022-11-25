@@ -1,3 +1,7 @@
+## 1.0.1
+
+- Separate io part.
+ 
 ## 1.0.0
 
 - Initial version.

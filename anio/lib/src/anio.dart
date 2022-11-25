@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
-
-import 'file_system.dart';
 
 part 'buffer.dart';
 part 'sink.dart';
