@@ -1,6 +1,10 @@
+## 1.0.4
+
+- Add lru remove callback.
+
 ## 1.0.3
 
-- export lru map.
+- Export lru map.
 
 ## 1.0.2
 

@@ -1,5 +1,7 @@
 import 'dart:collection';
 
+typedef LruRemove<V> = void Function(V value);
+
 /// An implementation of a [Map] which has a maximum size and uses a [Least
 /// Recently Used](http://en.wikipedia.org/wiki/Cache_algorithms#LRU) algorithm
 /// to remove items from the [Map] when the [maximumSize] is reached and new
@@ -11,7 +13,8 @@ import 'dart:collection';
 /// MRU position.
 abstract class LruMap<K, V> implements Map<K, V> {
   /// Creates a [LruMap] instance with the default implementation.
-  factory LruMap({int? maximumSize}) = LinkedLruHashMap<K, V>;
+  factory LruMap({int? maximumSize, LruRemove<V>? onLruRemove}) =
+      LinkedLruHashMap<K, V>;
 
   /// Maximum size of the [Map]. If [length] exceeds this value at any time, n
   /// entries accessed the earliest are removed, where n is [length] -
@@ -36,18 +39,21 @@ class _LinkedEntry<K, V> {
 /// A linked hash-table based implementation of [LruMap].
 class LinkedLruHashMap<K, V> implements LruMap<K, V> {
   /// Create a new LinkedLruHashMap with a [maximumSize].
-  factory LinkedLruHashMap({int? maximumSize}) =>
+  factory LinkedLruHashMap({int? maximumSize, LruRemove<V>? onLruRemove}) =>
       LinkedLruHashMap._fromMap(HashMap<K, _LinkedEntry<K, V>>(),
-          maximumSize: maximumSize);
+          maximumSize: maximumSize, onLruRemove: onLruRemove);
 
-  LinkedLruHashMap._fromMap(this._entries, {int? maximumSize})
+  LinkedLruHashMap._fromMap(this._entries,
+      {int? maximumSize, LruRemove<V>? onLruRemove})
       // This pattern is used instead of a default value because we want to
       // be able to respect null values coming in from MapCache.lru.
-      : _maximumSize = maximumSize;
+      : _maximumSize = maximumSize,
+        _onLruRemove = onLruRemove;
 
   final Map<K, _LinkedEntry<K, V>> _entries;
 
   int? _maximumSize;
+  LruRemove<V>? _onLruRemove;
 
   _LinkedEntry<K, V>? _head;
   _LinkedEntry<K, V>? _tail;
@@ -156,6 +162,10 @@ class LinkedLruHashMap<K, V> implements LruMap<K, V> {
       _removeLru();
     }
     _maximumSize = maximumSize;
+  }
+
+  set onLruRemove(LruRemove<V> onLruRemove) {
+    _onLruRemove = onLruRemove;
   }
 
   /// Look up the value associated with [key], or add a new value if it isn't
@@ -328,7 +338,7 @@ class LinkedLruHashMap<K, V> implements LruMap<K, V> {
   /// Removes the LRU position, shifting the linked list if necessary.
   void _removeLru() {
     // Remove the tail from the internal map.
-    _entries.remove(_tail!.key);
+    var entry = _entries.remove(_tail!.key)!;
 
     // Remove the tail element itself.
     _tail = _tail!.previous;
@@ -338,5 +348,7 @@ class LinkedLruHashMap<K, V> implements LruMap<K, V> {
     if (_tail == null) {
       _head = null;
     }
+
+    _onLruRemove?.call(entry.value);
   }
 }

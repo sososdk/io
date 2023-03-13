@@ -9,7 +9,7 @@ environment:
 dependencies:
   crypto: '>=3.0.2 <4.0.0'
   pool: '>=1.5.0 <2.0.0'
-  disk_cache: ^1.0.3
+  disk_cache: ^1.0.4
   file_system: ^1.0.1
   anio: ^1.0.0
 
