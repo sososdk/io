@@ -180,7 +180,7 @@ Future<void> main() async {
     cache = DiskCache(fileSystem, cacheDir,
         appVersion: appVersion, valueCount: valueCount);
 
-    await cache.get('k1').catchError((e) {});
+    await cache.get('k1').catchError((e) => null);
 
     // Now let it operate normally.
     fileSystem.setFaulty('$cacheDir/k1.0.tmp', false);
