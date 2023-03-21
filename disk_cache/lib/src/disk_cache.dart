@@ -373,6 +373,18 @@ class DiskCache {
     _mostRecentRebuildFailed = false;
   }
 
+  Future<bool> exists(String key) {
+    return _lock.synchronized(() async {
+      await _initialize();
+
+      _checkNotClosed();
+      _validateKey(key);
+      final entry = _lruEntries[key];
+      if (entry == null) return false;
+      return entry.exists();
+    });
+  }
+
   /// Returns a snapshot of the entry named [key], or null if it doesn't  exist
   /// is not currently readable. If a value is returned, it is moved to the head
   /// of the LRU queue.
@@ -883,6 +895,14 @@ class Entry {
   String getCleanFile(int i) => join(directory, '$key.$i');
 
   String getDirtyFile(int i) => join(directory, '$key.$i.tmp');
+
+  bool exists() {
+    if (!readable) return false;
+    if (!_cache._civilizedFileSystem && (currentEditor != null || zombie)) {
+      return false;
+    }
+    return true;
+  }
 
   /// Returns a snapshot of this entry. This opens all streams eagerly to
   /// guarantee that we see a single published snapshot. If we opened streams

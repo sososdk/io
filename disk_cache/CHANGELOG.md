@@ -1,3 +1,7 @@
+## 1.0.5
+
+- Add exists method.
+
 ## 1.0.4
 
 - Add lru remove callback.

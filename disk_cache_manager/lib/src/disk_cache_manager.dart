@@ -85,6 +85,7 @@ class DiskCacheManager {
     final key = _genKey(url);
     final snapshot = await _cache.get(key).catchError((e) {
       // Give up because the cache cannot be read.
+      return null;
     });
     if (snapshot != null) {
       try {
@@ -111,6 +112,11 @@ class DiskCacheManager {
     if (_closed) {
       throw StateError('fetch() may not be called on a closed manager.');
     }
+  }
+
+  Future<bool> exists(String url) {
+    _checkClose();
+    return _cache.exists(_genKey(url));
   }
 
   Future<bool> remove(String url) {
