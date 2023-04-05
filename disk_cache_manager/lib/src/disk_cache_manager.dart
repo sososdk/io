@@ -244,10 +244,14 @@ class TransparentTransformer implements Transformer<CacheResponse, void> {
   const TransparentTransformer();
 
   @override
-  FutureOr<void> transform(CacheResponse response) {
+  FutureOr<void> transform(CacheResponse response) async {
     final body = response.body;
-    if (body is _ReceivedSource) {
-      return body.skipAll();
+    try {
+      if (body is _ReceivedSource) {
+        return await body.skipAll();
+      }
+    } finally {
+      body.close();
     }
   }
 }
