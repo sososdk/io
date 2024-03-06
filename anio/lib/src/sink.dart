@@ -33,14 +33,26 @@ abstract class BufferedSink extends Sink {
   /// Writes a byte to this sink.
   FutureOr<void> writeInt8(int value);
 
+  /// Writes a byte to this sink.
+  FutureOr<void> writeUint8(int value);
+
   /// Writes two bytes to this sink.
   FutureOr<void> writeInt16(int value, [Endian endian = Endian.big]);
+
+  /// Writes two bytes to this sink.
+  FutureOr<void> writeUint16(int value, [Endian endian = Endian.big]);
 
   /// Writes four bytes to this sink.
   FutureOr<void> writeInt32(int value, [Endian endian = Endian.big]);
 
+  /// Writes four bytes to this sink.
+  FutureOr<void> writeUint32(int value, [Endian endian = Endian.big]);
+
   /// Writes eight bytes to this sink.
   FutureOr<void> writeInt64(int value, [Endian endian = Endian.big]);
+
+  /// Writes eight bytes to this sink.
+  FutureOr<void> writeUint64(int value, [Endian endian = Endian.big]);
 
   /// Writes four bytes to this sink.
   FutureOr<void> writeFloat32(double value, [Endian endian = Endian.big]);
@@ -95,7 +107,7 @@ class FaultHidingSink extends ForwardingSink {
   final void Function() onError;
   var _hasErrors = false;
 
-  FaultHidingSink(Sink sink, this.onError) : super(sink);
+  FaultHidingSink(super.sink, this.onError);
 
   @override
   FutureOr<void> write(Buffer source, int count) async {
@@ -188,9 +200,23 @@ class RealBufferedSink extends BufferedSink {
   }
 
   @override
+  FutureOr<void> writeUint8(int value) async {
+    assert(!_closed);
+    _buffer.writeUint8(value);
+    await emit();
+  }
+
+  @override
   FutureOr<void> writeInt16(int value, [Endian endian = Endian.big]) async {
     assert(!_closed);
     _buffer.writeInt16(value, endian);
+    await emit();
+  }
+
+  @override
+  FutureOr<void> writeUint16(int value, [Endian endian = Endian.big]) async {
+    assert(!_closed);
+    _buffer.writeUint16(value, endian);
     await emit();
   }
 
@@ -202,9 +228,23 @@ class RealBufferedSink extends BufferedSink {
   }
 
   @override
+  FutureOr<void> writeUint32(int value, [Endian endian = Endian.big]) async {
+    assert(!_closed);
+    _buffer.writeUint32(value, endian);
+    await emit();
+  }
+
+  @override
   FutureOr<void> writeInt64(int value, [Endian endian = Endian.big]) async {
     assert(!_closed);
     _buffer.writeInt64(value, endian);
+    await emit();
+  }
+
+  @override
+  FutureOr<void> writeUint64(int value, [Endian endian = Endian.big]) async {
+    assert(!_closed);
+    _buffer.writeUint64(value, endian);
     await emit();
   }
 

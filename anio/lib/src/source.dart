@@ -85,11 +85,21 @@ abstract class BufferedSource extends Source {
   /// The return value will be between -128 and 127, inclusive.
   FutureOr<int> readInt8();
 
+  /// Removes a byte from this source.
+  ///
+  /// The return value will be between 0 and 255, inclusive.
+  FutureOr<int> readUint8();
+
   /// Removes two bytes from this source.
   ///
   /// The return value will be between -2<sup>15</sup> and 2<sup>15</sup> - 1,
   /// inclusive.
   FutureOr<int> readInt16([Endian endian = Endian.big]);
+
+  /// Removes two bytes from this source.
+  ///
+  /// The return value will be between 0 and  2<sup>16</sup> - 1, inclusive.
+  FutureOr<int> readUint16([Endian endian = Endian.big]);
 
   /// Removes four bytes from this source.
   ///
@@ -97,11 +107,21 @@ abstract class BufferedSource extends Source {
   /// inclusive.
   FutureOr<int> readInt32([Endian endian = Endian.big]);
 
+  /// Removes four bytes from this source.
+  ///
+  /// The return value will be between 0 and  2<sup>32</sup> - 1, inclusive.
+  FutureOr<int> readUint32([Endian endian = Endian.big]);
+
   /// Removes eight bytes from this source.
   ///
   /// The return value will be between -2<sup>63</sup> and 2<sup>63</sup> - 1,
   /// inclusive.
   FutureOr<int> readInt64([Endian endian = Endian.big]);
+
+  /// Removes eight bytes from this source.
+  ///
+  /// The return value will be between 0 and  2<sup>64</sup> - 1, inclusive.
+  FutureOr<int> readUint64([Endian endian = Endian.big]);
 
   /// Removes four bytes from this source.
   ///
@@ -334,9 +354,21 @@ class RealBufferedSource extends BufferedSource {
   }
 
   @override
+  FutureOr<int> readUint8() async {
+    await require(1);
+    return _buffer.readUint8();
+  }
+
+  @override
   FutureOr<int> readInt16([Endian endian = Endian.big]) async {
     await require(2);
     return _buffer.readInt16(endian);
+  }
+
+  @override
+  FutureOr<int> readUint16([Endian endian = Endian.big]) async {
+    await require(2);
+    return _buffer.readUint16(endian);
   }
 
   @override
@@ -346,9 +378,21 @@ class RealBufferedSource extends BufferedSource {
   }
 
   @override
+  FutureOr<int> readUint32([Endian endian = Endian.big]) async {
+    await require(4);
+    return _buffer.readUint32(endian);
+  }
+
+  @override
   FutureOr<int> readInt64([Endian endian = Endian.big]) async {
     await require(8);
     return _buffer.readInt64(endian);
+  }
+
+  @override
+  FutureOr<int> readUint64([Endian endian = Endian.big]) async {
+    await require(8);
+    return _buffer.readUint64(endian);
   }
 
   @override

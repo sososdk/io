@@ -126,17 +126,12 @@ class Buffer implements BufferedSource, BufferedSink {
   @override
   int readInt8() {
     if (isEmpty) throw EOFException();
-    while (true) {
-      final chunk = _chunks.removeAt(0);
-      if (chunk.length > 1) {
-        _chunks.insert(0, chunk.sublist(1));
-        _length--;
-        return chunk[0];
-      } else if (chunk.length == 1) {
-        _length--;
-        return chunk[0];
-      }
-    }
+    return readBytes(1).buffer.asByteData().getInt8(0);
+  }
+
+  @override
+  FutureOr<int> readUint8() {
+    return readBytes(1).buffer.asByteData().getUint8(0);
   }
 
   @override
@@ -146,15 +141,33 @@ class Buffer implements BufferedSource, BufferedSink {
   }
 
   @override
+  FutureOr<int> readUint16([Endian endian = Endian.big]) {
+    if (_length < 2) throw EOFException();
+    return readBytes(2).buffer.asByteData().getUint16(0, endian);
+  }
+
+  @override
   int readInt32([Endian endian = Endian.big]) {
     if (_length < 4) throw EOFException();
     return readBytes(4).buffer.asByteData().getInt32(0, endian);
   }
 
   @override
+  FutureOr<int> readUint32([Endian endian = Endian.big]) {
+    if (_length < 4) throw EOFException();
+    return readBytes(4).buffer.asByteData().getUint32(0, endian);
+  }
+
+  @override
   int readInt64([Endian endian = Endian.big]) {
     if (_length < 8) throw EOFException();
     return readBytes(8).buffer.asByteData().getInt64(0, endian);
+  }
+
+  @override
+  FutureOr<int> readUint64([Endian endian = Endian.big]) {
+    if (_length < 8) throw EOFException();
+    return readBytes(8).buffer.asByteData().getUint64(0, endian);
   }
 
   @override
@@ -267,8 +280,13 @@ class Buffer implements BufferedSource, BufferedSink {
   }
 
   @override
-  void writeInt8(int byte) {
-    writeBytes(Uint8List(1)..[0] = byte);
+  void writeInt8(int value) {
+    writeBytes((ByteData(1)..setInt8(0, value)).buffer.asUint8List());
+  }
+
+  @override
+  FutureOr<void> writeUint8(int value) {
+    writeBytes((ByteData(1)..setUint8(0, value)).buffer.asUint8List());
   }
 
   @override
@@ -277,13 +295,28 @@ class Buffer implements BufferedSource, BufferedSink {
   }
 
   @override
+  FutureOr<void> writeUint16(int value, [Endian endian = Endian.big]) {
+    writeBytes((ByteData(2)..setUint16(0, value, endian)).buffer.asUint8List());
+  }
+
+  @override
   void writeInt32(int value, [Endian endian = Endian.big]) {
     writeBytes((ByteData(4)..setInt32(0, value, endian)).buffer.asUint8List());
   }
 
   @override
+  FutureOr<void> writeUint32(int value, [Endian endian = Endian.big]) {
+    writeBytes((ByteData(4)..setUint32(0, value, endian)).buffer.asUint8List());
+  }
+
+  @override
   void writeInt64(int value, [Endian endian = Endian.big]) {
     writeBytes((ByteData(8)..setInt64(0, value, endian)).buffer.asUint8List());
+  }
+
+  @override
+  FutureOr<void> writeUint64(int value, [Endian endian = Endian.big]) {
+    writeBytes((ByteData(8)..setUint64(0, value, endian)).buffer.asUint8List());
   }
 
   @override

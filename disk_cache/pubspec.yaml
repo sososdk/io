@@ -1,18 +1,18 @@
 name: disk_cache
 description: Disk lru cache for dart.
-version: 1.0.5
+version: 1.0.6
 homepage: https://github.com/sososdk/io/tree/master/disk_cache
 
 environment:
-  sdk: '>=2.16.2 <3.0.0'
+  sdk: '>=2.16.2 <4.0.0'
 
 dependencies:
   logging: '>=1.0.2 <2.0.0'
   path: '>=1.8.0 <2.0.0'
   meta: '>=1.7.0 <2.0.0'
-  file_system: ^1.0.1
-  anio: ^1.0.0
+  file_system: ^1.0.2
+  anio: ^1.0.1
 
 dev_dependencies:
-  lints: ^2.0.1
-  test: ^1.23.1
+  lints: ^3.0.0
+  test: ^1.25.2

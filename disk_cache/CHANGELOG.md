@@ -1,3 +1,7 @@
+## 1.0.6
+
+- update dependencies.
+
 ## 1.0.5
 
 - Add exists method.

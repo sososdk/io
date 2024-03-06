@@ -1,3 +1,7 @@
+## 1.0.4
+
+- update dependencies.
+
 ## 1.0.3
 
 - fix: body not close when cache.
