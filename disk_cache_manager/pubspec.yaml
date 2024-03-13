@@ -11,7 +11,7 @@ dependencies:
   pool: '>=1.5.0 <2.0.0'
   disk_cache: ^1.0.6
   file_system: ^1.0.2
-  anio: ^1.0.1
+  anio: ^1.1.0
 
 dev_dependencies:
   lints: ^3.0.0

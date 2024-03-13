@@ -1,6 +1,6 @@
 part of 'anio.dart';
 
-abstract class Source {
+abstract interface class Source {
   /// Remove [count] bytes from this and appends them to [sink]. Returns
   /// the number of bytes read.
   FutureOr<int> read(Buffer sink, int count);
@@ -12,7 +12,7 @@ abstract class Source {
 }
 
 extension SourceBuffer on Source {
-  BufferedSource buffer() => RealBufferedSource(this);
+  BufferedSource buffer() => _RealBufferedSource(this);
 
   /// Attempts to exhaust this, returning true if successful. This is useful when reading a complete
   /// source is helpful, such as when doing so completes a cache body or frees a socket connection for
@@ -41,10 +41,10 @@ extension SourceBuffer on Source {
 }
 
 extension FutureSourceBuffer on Future<Source> {
-  Future<BufferedSource> buffer() async => RealBufferedSource(await this);
+  Future<BufferedSource> buffer() async => _RealBufferedSource(await this);
 }
 
-abstract class BufferedSource extends Source {
+abstract interface class BufferedSource implements Source {
   /// This source's internal buffer.
   Buffer get buffer;
 
@@ -158,7 +158,7 @@ abstract class BufferedSource extends Source {
   FutureOr<String> readLineStrict({Encoding encoding = utf8, int? end});
 }
 
-class ForwardingSource extends Source {
+class ForwardingSource implements Source {
   final Source delegate;
 
   ForwardingSource(this.delegate);
@@ -170,91 +170,8 @@ class ForwardingSource extends Source {
   FutureOr close() => delegate.close();
 }
 
-class FileSource extends Source {
-  FileSource(this.file);
-
-  final RandomAccessFile file;
-  bool _closed = false;
-
-  @override
-  Future<int> read(Buffer sink, int count) {
-    assert(!_closed);
-    return file.read(count).then((e) {
-      if (e.isNotEmpty) sink.writeBytes(e);
-      return e.length;
-    });
-  }
-
-  @override
-  Future<void> close() async {
-    if (_closed) return;
-    _closed = true;
-    await file.close();
-  }
-}
-
-class StreamSource extends Source {
-  StreamSource(this.stream) {
-    _subscription = stream.listen(
-      (event) {
-        _subscription.pause();
-        try {
-          _receiveBuffer.writeBytes(event);
-          _completer?.complete();
-        } catch (error, stackTrace) {
-          _subscription
-              .cancel()
-              .whenComplete(() => _completer?.completeError(error, stackTrace));
-        }
-      },
-      onError: (error, stackTrace) {
-        _completer?.completeError(error, stackTrace);
-      },
-      onDone: () {
-        _done = true;
-        _completer?.complete();
-      },
-      cancelOnError: true,
-    );
-  }
-
-  final _receiveBuffer = Buffer();
-  final Stream<List<int>> stream;
-  late StreamSubscription<List<int>> _subscription;
-  Completer? _completer;
-  bool _done = false;
-  bool _closed = false;
-
-  @override
-  Future<int> read(Buffer sink, int count) async {
-    assert(!_closed);
-    _subscription.resume();
-    while (_receiveBuffer.isEmpty) {
-      if (_done) {
-        return 0;
-      }
-      final completer = _completer = Completer();
-      await completer.future;
-      _completer = null;
-    }
-    final length = min(count, _receiveBuffer.length);
-    sink.write(_receiveBuffer, length);
-    return length;
-  }
-
-  @override
-  Future<void> close() async {
-    if (_closed) return;
-    _closed = true;
-    await _subscription.cancel();
-    try {
-      _completer?.completeError('StreamSource closed.');
-    } catch (_) {}
-  }
-}
-
-class RealBufferedSource extends BufferedSource {
-  RealBufferedSource(Source source)
+class _RealBufferedSource implements BufferedSource {
+  _RealBufferedSource(Source source)
       : _source = source,
         _buffer = Buffer();
 
@@ -268,28 +185,29 @@ class RealBufferedSource extends BufferedSource {
 
   @override
   FutureOr<int> read(Buffer sink, int count) async {
-    assert(count > 0);
-    assert(!_closed);
-    int read = 0;
-    while (read < count) {
+    assert(count >= 0);
+    check(!_closed, 'closed');
+    int totalBytes = 0;
+    while (totalBytes < count) {
       if (_buffer.isEmpty) {
-        final read = await _source.read(_buffer, kBlockSize);
-        if (read == 0) return read;
+        final count = await _source.read(_buffer, kBlockSize);
+        if (count == 0) return totalBytes;
       }
-      read += _buffer.read(sink, min(_buffer.length, count - read));
+      totalBytes += _buffer.read(sink, min(_buffer.length, count - totalBytes));
     }
-    return read;
+    return totalBytes;
   }
 
   @override
   FutureOr<bool> exhausted() async {
+    check(!_closed, 'closed');
     return _buffer.exhausted() && await _source.read(_buffer, kBlockSize) == 0;
   }
 
   @override
   FutureOr<bool> request(int count) async {
     assert(count >= 0);
-    assert(!_closed);
+    check(!_closed, 'closed');
     while (_buffer.length < count) {
       if (await _source.read(_buffer, kBlockSize) == 0) return false;
     }
@@ -303,7 +221,7 @@ class RealBufferedSource extends BufferedSource {
 
   @override
   FutureOr<void> skip(int count) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     while (count > 0) {
       if (_buffer.isEmpty && await _source.read(_buffer, kBlockSize) == 0) {
         throw EOFException();
@@ -316,7 +234,7 @@ class RealBufferedSource extends BufferedSource {
 
   @override
   FutureOr<int> indexOf(int element, [int start = 0, int? end]) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     assert(end == null || start < end);
     while (end == null || start < end) {
       final result = _buffer.indexOf(element, start, end);
@@ -410,27 +328,30 @@ class RealBufferedSource extends BufferedSource {
   @override
   FutureOr<int> readIntoBytes(Uint8List sink, [int start = 0, int? end]) async {
     end = RangeError.checkValidRange(start, end, sink.length);
-    int read = 0;
+    int totalBytes = 0;
     while (end > start) {
       if (_buffer.isEmpty && await _source.read(_buffer, kBlockSize) == 0) {
-        return read;
+        return totalBytes;
       }
       final count = _buffer.readIntoBytes(sink, start, end);
-      read += count;
+      totalBytes += count;
       start += count;
     }
-    return read;
+    return totalBytes;
   }
 
   @override
   FutureOr<int> readIntoSink(Sink sink) async {
-    int read = 0;
-    while (_buffer.isNotEmpty) {
-      read += _buffer.length;
+    int totalBytes = 0;
+    if (_buffer.isNotEmpty) {
+      totalBytes += _buffer.length;
       await sink.write(_buffer, _buffer.length);
-      await _source.read(_buffer, kBlockSize);
     }
-    return read;
+    while (await _source.read(_buffer, kBlockSize) != 0) {
+      totalBytes += _buffer.length;
+      await sink.write(_buffer, _buffer.length);
+    }
+    return totalBytes;
   }
 
   @override
@@ -477,4 +398,68 @@ class RealBufferedSource extends BufferedSource {
 
   @override
   String toString() => 'buffer($_source)';
+}
+
+extension StreamSource on Stream<List<int>> {
+  Source source() => _StreamSource(this);
+}
+
+class _StreamSource implements Source {
+  _StreamSource(this.stream) {
+    _subscription = stream.listen(
+      (event) {
+        _subscription.pause();
+        try {
+          _receiveBuffer.writeBytes(event);
+          _completer?.complete();
+        } catch (error, stackTrace) {
+          _subscription
+              .cancel()
+              .whenComplete(() => _completer?.completeError(error, stackTrace));
+        }
+      },
+      onError: (error, stackTrace) {
+        _completer?.completeError(error, stackTrace);
+      },
+      onDone: () {
+        _done = true;
+        _completer?.complete();
+      },
+      cancelOnError: true,
+    );
+  }
+
+  final _receiveBuffer = Buffer();
+  final Stream<List<int>> stream;
+  late StreamSubscription<List<int>> _subscription;
+  Completer? _completer;
+  bool _done = false;
+  bool _closed = false;
+
+  @override
+  Future<int> read(Buffer sink, int count) async {
+    check(!_closed, 'closed');
+    _subscription.resume();
+    while (_receiveBuffer.isEmpty) {
+      if (_done) {
+        return 0;
+      }
+      final completer = _completer = Completer();
+      await completer.future;
+      _completer = null;
+    }
+    final length = min(count, _receiveBuffer.length);
+    sink.write(_receiveBuffer, length);
+    return length;
+  }
+
+  @override
+  Future<void> close() async {
+    if (_closed) return;
+    _closed = true;
+    await _subscription.cancel();
+    try {
+      _completer?.completeError('StreamSource closed.');
+    } catch (_) {}
+  }
 }

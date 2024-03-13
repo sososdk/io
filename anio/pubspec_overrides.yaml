@@ -1,0 +1,3 @@
+dependency_overrides:
+  synchronizer:
+    path: ../synchronizer

@@ -94,24 +94,24 @@ class Buffer implements BufferedSource, BufferedSink {
   @override
   int readIntoBytes(Uint8List sink, [int start = 0, int? end]) {
     end = RangeError.checkValidRange(start, end, sink.length);
-    int read = 0;
+    int totalBytes = 0;
     while (end > start) {
-      if (isEmpty) return read;
+      if (isEmpty) return totalBytes;
       final chunk = _chunks.removeAt(0);
       if (chunk.length > end - start) {
         _length -= end - start;
         _chunks.insert(0, chunk.sublist(end - start));
         sink.setRange(start, end, chunk);
-        read += end - start;
+        totalBytes += end - start;
         start = end;
       } else {
         _length -= chunk.length;
         sink.setRange(start, start + chunk.length, chunk);
-        read += chunk.length;
+        totalBytes += chunk.length;
         start += chunk.length;
       }
     }
-    return read;
+    return totalBytes;
   }
 
   @override
@@ -351,14 +351,14 @@ class Buffer implements BufferedSource, BufferedSink {
     count ??= _length;
     if (_length == 0) return Uint8List(0);
     final sink = Uint8List(min(count, _length));
-    int read = 0;
+    int offset = 0;
     for (var chunk in _chunks) {
-      if (read + chunk.length > count) {
-        sink.setRange(read, count, chunk);
+      if (offset + chunk.length >= count) {
+        sink.setRange(offset, count, chunk);
         break;
       } else {
-        sink.setRange(read, read + chunk.length, chunk);
-        read += chunk.length;
+        sink.setRange(offset, offset + chunk.length, chunk);
+        offset += chunk.length;
       }
     }
     return sink;

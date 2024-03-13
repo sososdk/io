@@ -269,7 +269,7 @@ class _CacheSourceBody extends ForwardingSource {
   }
 }
 
-class _CacheSinkBody extends Source {
+class _CacheSinkBody implements Source {
   _CacheSinkBody(this.editor, this.bodySource, Sink bodySink)
       : bodySink = bodySink.buffer();
 
@@ -387,7 +387,7 @@ class _DefaultFetcher implements Fetcher {
       responseHeaders,
       response.statusCode,
       response.contentLength,
-      StreamSource(stream),
+      stream.source(),
     );
   }
 

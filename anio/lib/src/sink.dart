@@ -1,6 +1,6 @@
 part of 'anio.dart';
 
-abstract class Sink {
+abstract interface class Sink {
   /// Removes [count] bytes from [source] and appends them to this.
   FutureOr<void> write(Buffer source, int count);
 
@@ -13,14 +13,14 @@ abstract class Sink {
 }
 
 extension SinkBuffer on Sink {
-  BufferedSink buffer() => RealBufferedSink(this);
+  BufferedSink buffer() => _RealBufferedSink(this);
 }
 
 extension FutureSinkBuffer on Future<Sink> {
-  Future<BufferedSink> buffer() async => RealBufferedSink(await this);
+  Future<BufferedSink> buffer() async => _RealBufferedSink(await this);
 }
 
-abstract class BufferedSink extends Sink {
+abstract interface class BufferedSink implements Sink {
   Buffer get buffer;
 
   /// Removes all bytes from `source` and appends them to this sink. Returns the number of bytes read
@@ -149,25 +149,8 @@ class FaultHidingSink extends ForwardingSink {
   }
 }
 
-class FileSink extends Sink {
-  final RandomAccessFile file;
-
-  FileSink(this.file);
-
-  @override
-  Future<void> write(Buffer source, int count) {
-    return file.writeFrom(source.readBytes(count));
-  }
-
-  @override
-  Future<void> flush() => file.flush();
-
-  @override
-  Future<void> close() => file.close();
-}
-
-class RealBufferedSink extends BufferedSink {
-  RealBufferedSink(Sink sink)
+class _RealBufferedSink implements BufferedSink {
+  _RealBufferedSink(Sink sink)
       : _sink = sink,
         _buffer = Buffer();
   final Sink _sink;
@@ -180,70 +163,70 @@ class RealBufferedSink extends BufferedSink {
 
   @override
   FutureOr<void> write(Buffer source, int count) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     _buffer.write(source, count);
     await emit();
   }
 
   @override
   FutureOr<void> writeBytes(Uint8List source, [int start = 0, int? end]) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     _buffer.writeBytes(source, start, end);
     await emit();
   }
 
   @override
   FutureOr<void> writeInt8(int value) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     _buffer.writeInt8(value);
     await emit();
   }
 
   @override
   FutureOr<void> writeUint8(int value) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     _buffer.writeUint8(value);
     await emit();
   }
 
   @override
   FutureOr<void> writeInt16(int value, [Endian endian = Endian.big]) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     _buffer.writeInt16(value, endian);
     await emit();
   }
 
   @override
   FutureOr<void> writeUint16(int value, [Endian endian = Endian.big]) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     _buffer.writeUint16(value, endian);
     await emit();
   }
 
   @override
   FutureOr<void> writeInt32(int value, [Endian endian = Endian.big]) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     _buffer.writeInt32(value, endian);
     await emit();
   }
 
   @override
   FutureOr<void> writeUint32(int value, [Endian endian = Endian.big]) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     _buffer.writeUint32(value, endian);
     await emit();
   }
 
   @override
   FutureOr<void> writeInt64(int value, [Endian endian = Endian.big]) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     _buffer.writeInt64(value, endian);
     await emit();
   }
 
   @override
   FutureOr<void> writeUint64(int value, [Endian endian = Endian.big]) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     _buffer.writeUint64(value, endian);
     await emit();
   }
@@ -253,7 +236,7 @@ class RealBufferedSink extends BufferedSink {
     double value, [
     Endian endian = Endian.big,
   ]) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     _buffer.writeFloat32(value, endian);
     await emit();
   }
@@ -263,14 +246,14 @@ class RealBufferedSink extends BufferedSink {
     double value, [
     Endian endian = Endian.big,
   ]) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     _buffer.writeFloat64(value, endian);
     await emit();
   }
 
   @override
   FutureOr<int> writeSource(Source source) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     int total = 0;
     while (true) {
       final read = await source.read(_buffer, kBlockSize);
@@ -283,7 +266,7 @@ class RealBufferedSink extends BufferedSink {
 
   @override
   FutureOr<void> writeString(String string, [Encoding encoding = utf8]) async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     _buffer.writeString(string, encoding);
     await emit();
   }
@@ -300,7 +283,7 @@ class RealBufferedSink extends BufferedSink {
 
   @override
   FutureOr<void> emit() async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     if (_buffer.isNotEmpty) {
       await _sink.write(_buffer, _buffer.length);
     }
@@ -308,7 +291,7 @@ class RealBufferedSink extends BufferedSink {
 
   @override
   FutureOr<void> flush() async {
-    assert(!_closed);
+    check(!_closed, 'closed');
     if (_buffer.isNotEmpty) {
       await _sink.write(_buffer, _buffer.length);
     }
@@ -336,4 +319,43 @@ class RealBufferedSink extends BufferedSink {
     _closed = true;
     if (thrown != null) throw thrown;
   }
+}
+
+extension StreamSink on core.Sink<List<int>> {
+  Sink sink() => _StreamSink(this);
+}
+
+class _StreamSink implements Sink {
+  _StreamSink(this.sink);
+
+  final core.Sink<List<int>> sink;
+
+  @override
+  FutureOr<void> write(Buffer source, int count) async {
+    RangeError.checkValueInInterval(count, 0, source.length);
+    while (count > 0) {
+      if (source.isEmpty) return;
+      final chunk = source._chunks.removeAt(0);
+      if (chunk.length > count) {
+        sink.add(chunk.sublist(0, count));
+        source._chunks.insert(0, chunk.sublist(count));
+        source._length -= count;
+        count = 0;
+      } else {
+        sink.add(chunk);
+        source._length -= chunk.length;
+        count -= chunk.length;
+      }
+    }
+  }
+
+  @override
+  FutureOr<void> flush() {
+    if (sink is IOSink) {
+      return (sink as IOSink).flush();
+    }
+  }
+
+  @override
+  FutureOr<void> close() async => sink.close();
 }

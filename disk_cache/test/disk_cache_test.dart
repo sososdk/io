@@ -192,18 +192,18 @@ Future<void> main() async {
   test('validate key', () async {
     String? key;
     key = 'has_space ';
-    expect(cache.edit(key), throwsArgumentError);
+    await expectLater(() => cache.edit(key!), throwsArgumentError);
     key = 'has_CR\r';
-    expect(cache.edit(key), throwsArgumentError);
+    await expectLater(() => cache.edit(key!), throwsArgumentError);
     key = 'has_LF\n';
-    expect(cache.edit(key), throwsArgumentError);
+    await expectLater(() => cache.edit(key!), throwsArgumentError);
     key = 'has_invalid/';
-    expect(cache.edit(key), throwsArgumentError);
+    await expectLater(() => cache.edit(key!), throwsArgumentError);
     key = 'has_invalid☃';
-    expect(cache.edit(key), throwsArgumentError);
+    await expectLater(() => cache.edit(key!), throwsArgumentError);
     key =
         'this_is_way_too_long_this_is_way_too_long_this_is_way_too_long_this_is_way_too_long_this_is_way_too_long_this_is_way_too_long';
-    expect(cache.edit(key), throwsArgumentError);
+    await expectLater(() => cache.edit(key!), throwsArgumentError);
 
     // Test valid cases.
     // Exactly 120.
@@ -492,7 +492,7 @@ Future<void> main() async {
   test('create new entry with too few values fails', () async {
     final creator = await cache.edit('k1').then((value) => value!);
     await creator.setString(1, 'A');
-    expect(creator.commit(), throwsStateError);
+    await expectLater(creator.commit, throwsStateError);
     expect(await fileSystem.exists(getCleanFile('k1', 0)), isFalse);
     expect(await fileSystem.exists(getCleanFile('k1', 1)), isFalse);
     expect(await fileSystem.exists(getDirtyFile('k1', 0)), isFalse);

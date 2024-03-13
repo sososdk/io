@@ -1,8 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:anio/anio.dart';
-import 'package:file/file.dart';
 import 'package:file/memory.dart';
 import 'package:test/test.dart';
 
@@ -69,14 +69,14 @@ void main() {
       final buffer = Buffer();
       buffer.writeBytes(List.generate(300, (i) => i));
 
-      final byte = buffer.indexOf(10);
-      expect(byte, 10);
+      expect(10, buffer.indexOf(10));
+      expect(-1, buffer.indexOf(256));
     });
 
     test('read into sink', () async {
       final fileSystem = MemoryFileSystem();
       final file = fileSystem.file('/test');
-      final sink = FileSink(file.openSync(mode: FileMode.write));
+      final sink = file.openWrite().sink();
 
       final buffer = Buffer();
       buffer.writeString('hello');
@@ -135,7 +135,7 @@ void main() {
       await fileSystem
           .file('/test')
           .create(recursive: true)
-          .then((e) async => FileSink(await e.open(mode: FileMode.write)))
+          .then((e) => e.openWrite().sink())
           .buffer()
           .then((e) async {
         await e.writeLine('hello');
@@ -143,8 +143,7 @@ void main() {
         await e.writeString('hello3\r');
         await e.close();
       });
-      final source =
-          await fileSystem.file('/test').open().then((e) => FileSource(e));
+      final source = fileSystem.file('/test').openRead().source();
       await buffer.writeSource(source);
 
       expect(buffer.readInt8(), 1);
@@ -278,13 +277,145 @@ void main() {
     });
   });
 
-  group('sink and source', () {
+  group('BufferedSource', () {
+    late int total;
+    late Buffer buffer;
+    late BufferedSource source;
+
+    setUp(() {
+      total = kBlockSize * 2;
+      buffer = Buffer()..writeBytes(List.generate(total, (i) => i));
+      source = (buffer as Source).buffer();
+    });
+
     test('read', () async {
+      final sink = Buffer();
+
+      expect(await source.read(sink, 2), 2);
+      expect(await source.read(sink, 100), 100);
+      final remaining = total - 100 - 2;
+      expect(await source.read(sink, total), remaining);
+      expect(await source.read(sink, 1), 0);
+
+      expect(buffer.length, 0);
+      expect(sink.length, total);
+    });
+
+    test('exhausted', () async {
+      expect(await source.exhausted(), isFalse);
+      await source.readBytes();
+      expect(await source.exhausted(), isTrue);
+    });
+
+    test('request', () async {
+      expect(await source.request(0), isTrue);
+      expect(await source.request(30), isTrue);
+      expect(await source.request(20), isTrue);
+      expect(await source.request(total), isTrue);
+      expect(await source.request(total + 1), isFalse);
+    });
+
+    test('require', () async {
+      expect(() => source.require(total + 1), throwsA(isA<EOFException>()));
+    });
+
+    test('indexOf', () async {
+      expect(await source.indexOf(12), 12);
+      expect(await source.indexOf(255), 255);
+      expect(await source.indexOf(256), -1);
+    });
+
+    test('indexOf', () async {
+      expect(await source.indexOf(12), 12);
+      expect(await source.indexOf(255), 255);
+      expect(await source.indexOf(256), -1);
+    });
+
+    test('readBytes', () async {
+      expect(await source.readBytes(2), [0, 1]);
+      await source.skip(total - 4);
+      expect(await source.readBytes(2), [(total - 2) % 256, (total - 1) % 256]);
+      expect(() => source.readBytes(2), throwsA(isA<EOFException>()));
+    });
+
+    test('read num', () async {
+      buffer.clear();
+      buffer.writeInt8(0);
+      buffer.writeUint8(1);
+      buffer.writeInt16(2);
+      buffer.writeUint16(3);
+      buffer.writeInt32(4);
+      buffer.writeUint32(5);
+      buffer.writeInt64(6);
+      buffer.writeUint64(7);
+      buffer.writeFloat32(8);
+      buffer.writeFloat64(9);
+      expect(await source.readInt8(), 0);
+      expect(await source.readUint8(), 1);
+      expect(await source.readInt16(), 2);
+      expect(await source.readUint16(), 3);
+      expect(await source.readInt32(), 4);
+      expect(await source.readUint32(), 5);
+      expect(await source.readInt64(), 6);
+      expect(await source.readUint64(), 7);
+      expect(await source.readFloat32(), 8);
+      expect(await source.readFloat64(), 9);
+    });
+
+    test('readIntoBytes', () async {
+      final sink = Uint8List(2);
+      var count = await source.readIntoBytes(sink);
+      expect(count, 2);
+      expect(sink, [0, 1]);
+
+      count = await source.readIntoBytes(sink, 1, 2);
+      expect(count, 1);
+      expect(sink, [0, 2]);
+
+      await source.skip(total - 5);
+
+      count = await source.readIntoBytes(sink);
+      expect(count, 2);
+      expect(sink, [(total - 2) % 256, (total - 1) % 256]);
+
+      count = await source.readIntoBytes(sink);
+      expect(count, 0);
+      expect(sink, [(total - 2) % 256, (total - 1) % 256]);
+    });
+
+    test('readIntoSink', () async {
+      final sink = Buffer();
+
+      final count = await source.readIntoSink(sink);
+      expect(count, total);
+      expect(sink.length, total);
+    });
+
+    test('read string', () async {
+      buffer = Buffer()..writeString('''
+中国
+
+Line 1
+Line 2
+Line 3''');
+      source = (buffer as Source).buffer();
+
+      expect(await source.readString(count: 6), '中国');
+      expect(await source.readLine(), '');
+      expect(await source.readLine(), '');
+      expect(await source.readLine(), 'Line 1');
+      expect(await source.readLineStrict(), 'Line 2');
+      expect(() => source.readLineStrict(), throwsA(isA<EOFException>()));
+    });
+  });
+
+  group('file sink and source', () {
+    test('write and read', () async {
       final fileSystem = MemoryFileSystem();
       await fileSystem
           .file('/test')
           .create(recursive: true)
-          .then((e) async => FileSink(await e.open(mode: FileMode.write)))
+          .then((e) => e.openWrite().sink())
           .buffer()
           .then((e) async {
         await e.writeInt8(1);
@@ -303,11 +434,7 @@ void main() {
         await e.close();
       });
 
-      final source = await fileSystem
-          .file('/test')
-          .open()
-          .then((e) => FileSource(e))
-          .buffer();
+      final source = fileSystem.file('/test').openRead().source().buffer();
       expect(await source.readInt8(), 1);
       expect(await source.readInt16(Endian.little), 2);
       expect(await source.readInt32(), 3);
@@ -324,6 +451,80 @@ void main() {
       final sink = Buffer();
       expect(await source.readIntoSink(sink), 13);
       expect(sink.readString(), 'I am a buffer');
+    });
+  });
+
+  group('file handle', () {
+    test('write and read and append', () async {
+      final path = '/test';
+      final bytes = Uint8List(7);
+      final buffer = Buffer();
+
+      final fileSystem = MemoryFileSystem();
+      final handle =
+          FileHandle(await fileSystem.file(path).open(mode: FileMode.write));
+      final sink = await handle.sink().buffer();
+      final source = await handle.source().buffer();
+      await handle.close();
+
+      // write
+      await sink.writeInt8(1);
+      await sink.writeInt16(2, Endian.little);
+      await sink.writeInt32(3);
+      await sink.writeInt64(4);
+      await sink.writeFloat32(5);
+      await sink.writeFloat64(6, Endian.little);
+      await sink.writeCharCode('0'.codeUnitAt(0));
+      await sink.writeLine('hello');
+      await sink.writeString('hello2\r\n');
+      await sink.writeString('hello3\r');
+      buffer.writeString('I am a buffer');
+      await sink.write(buffer, buffer.length);
+      await sink.close();
+
+      // read
+      expect(await source.readInt8(), 1);
+      expect(await source.readInt16(Endian.little), 2);
+      expect(await source.readInt32(), 3);
+      expect(await source.readInt64(), 4);
+      expect(await source.readFloat32(), 5);
+      expect(await source.readFloat64(Endian.little), 6);
+      expect(await source.readInt8(), '0'.codeUnitAt(0));
+      expect(await source.readLine(), 'hello');
+      expect(await source.readLine(), 'hello2');
+      await expectLater(source.readLineStrict, throwsA(isA<EOFException>()));
+      expect(await source.readIntoBytes(bytes), 7);
+      expect(String.fromCharCodes(bytes), 'hello3\r');
+      expect(await source.readIntoSink(buffer), 13);
+      expect(buffer.readString(), 'I am a buffer');
+      await source.close();
+
+      // append
+      final appendHandle =
+          FileHandle(await fileSystem.file(path).open(mode: FileMode.append));
+      final appendSink = await appendHandle.sink().buffer();
+      final appendSource = await appendHandle.source(0).buffer();
+      await appendHandle.close();
+
+      await appendSink.writeString('appended');
+      await appendSink.close();
+
+      expect(await appendSource.readInt8(), 1);
+      expect(await appendSource.readInt16(Endian.little), 2);
+      expect(await appendSource.readInt32(), 3);
+      expect(await appendSource.readInt64(), 4);
+      expect(await appendSource.readFloat32(), 5);
+      expect(await appendSource.readFloat64(Endian.little), 6);
+      expect(await appendSource.readInt8(), '0'.codeUnitAt(0));
+      expect(await appendSource.readLine(), 'hello');
+      expect(await appendSource.readLine(), 'hello2');
+      await expectLater(
+          appendSource.readLineStrict, throwsA(isA<EOFException>()));
+      expect(await appendSource.readIntoBytes(bytes), 7);
+      expect(String.fromCharCodes(bytes), 'hello3\r');
+      expect(await appendSource.readIntoSink(buffer), 13 + 8);
+      expect(buffer.readString(), 'I am a bufferappended');
+      appendSource.close();
     });
   });
 }

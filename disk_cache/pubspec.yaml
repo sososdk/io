@@ -10,8 +10,9 @@ dependencies:
   logging: '>=1.0.2 <2.0.0'
   path: '>=1.8.0 <2.0.0'
   meta: '>=1.7.0 <2.0.0'
+  anio: ^1.1.0
   file_system: ^1.0.2
-  anio: ^1.0.1
+  synchronizer: ^1.0.1
 
 dev_dependencies:
   lints: ^3.0.0

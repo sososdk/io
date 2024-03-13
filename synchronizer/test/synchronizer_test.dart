@@ -158,7 +158,7 @@ void main() {
   });
 }
 
-void run(Lock newLock()) {
+void run(Lock Function() newLock) {
   group('base lock', () {
     test('two_locks', () async {
       var lock1 = Lock();

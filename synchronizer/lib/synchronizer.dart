@@ -14,7 +14,8 @@ abstract interface class Lock {
   /// If [timeout] is specified, it will try to grab the lock and will not
   /// call the computation callback and throw a [TimeoutException] if the lock
   /// cannot be grabbed in the given duration.
-  Future<T> synchronized<T>(FutureOr<T> computation(), {Duration? timeout});
+  Future<T> synchronized<T>(FutureOr<T> Function() computation,
+      {Duration? timeout, bool checkReentrant = true});
 }
 
 class _Lock implements Lock {
@@ -23,10 +24,13 @@ class _Lock implements Lock {
 
   @override
   Future<T> synchronized<T>(
-    FutureOr<T> computation(), {
+    FutureOr<T> Function() computation, {
     Duration? timeout,
+    bool checkReentrant = true,
   }) async {
-    assert(!(Zone.current[this] ?? false), 'Can not reentrant.');
+    if (checkReentrant && (Zone.current[this] ?? false)) {
+      throw StateError('Can not reentrant.');
+    }
 
     final prev = _last;
     final completer = Completer.sync();
@@ -78,7 +82,11 @@ class _ReentrantLock implements Lock {
   final _lock = _Lock();
 
   @override
-  Future<T> synchronized<T>(FutureOr<T> computation(), {Duration? timeout}) {
+  Future<T> synchronized<T>(
+    FutureOr<T> Function() computation, {
+    Duration? timeout,
+    bool checkReentrant = true,
+  }) {
     return ((Zone.current[this] as _Lock?) ?? _lock).synchronized(() async {
       final result = runZoned(() => computation(), zoneValues: {this: _Lock()});
       if (result is Future) {
@@ -86,7 +94,7 @@ class _ReentrantLock implements Lock {
       } else {
         return result;
       }
-    }, timeout: timeout);
+    }, timeout: timeout, checkReentrant: checkReentrant);
   }
 
   @override

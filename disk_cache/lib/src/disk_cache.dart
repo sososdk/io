@@ -4,8 +4,8 @@ import 'package:anio/anio.dart';
 import 'package:file_system/file_system.dart';
 import 'package:meta/meta.dart';
 import 'package:path/path.dart';
+import 'package:synchronizer/synchronizer.dart';
 
-import 'lock.dart';
 import 'logger.dart';
 import 'lru_map.dart';
 
@@ -191,13 +191,11 @@ class DiskCache {
           _mostRecentRebuildFailed = true;
           _journalWriter = BlackHoleSink().buffer();
         }
-      });
+      }, checkReentrant: false);
 
   Future<void> initialize() => _lock.synchronized(() => _initialize());
 
   Future<void> _initialize() async {
-    _assertLock();
-
     if (_initialized) {
       return; // Already initialized.
     }
@@ -235,8 +233,6 @@ class DiskCache {
   }
 
   Future<void> _readJournal() {
-    _assertLock();
-
     return fileSystem.read(journalFile, (source) async {
       final magic = await source.readLineStrict();
       final version = await source.readLineStrict();
@@ -273,9 +269,9 @@ class DiskCache {
   }
 
   Future<BufferedSink> _newJournalWriter() async {
-    final fileSink = await fileSystem.sink(journalFile, mode: FileMode.append);
+    final fileSink = await fileSystem.sink(journalFile,
+        mode: FileMode.append, recursive: true);
     final faultHidingSink = FaultHidingSink(fileSink, () {
-      _assertLock();
       _hasJournalErrors = true;
     });
     return faultHidingSink.buffer();
@@ -322,7 +318,7 @@ class DiskCache {
   /// Computes the initial size and collects garbage as a part of opening the
   /// cache. Dirty entries are assumed to be inconsistent and will be deleted.
   Future<void> _processJournal() async {
-    await fileSystem.deleteIfExists(journalFileTmp);
+    await fileSystem.delete(journalFileTmp);
     final toRemove = <Entry>[];
     for (final entry in _lruEntries.values) {
       if (entry.currentEditor == null) {
@@ -332,8 +328,8 @@ class DiskCache {
       } else {
         entry.currentEditor = null;
         for (var t = 0; t < valueCount; t++) {
-          await fileSystem.deleteIfExists(entry.getCleanFile(t));
-          await fileSystem.deleteIfExists(entry.getDirtyFile(t));
+          await fileSystem.delete(entry.getCleanFile(t));
+          await fileSystem.delete(entry.getDirtyFile(t));
         }
         toRemove.add(entry);
       }
@@ -344,7 +340,6 @@ class DiskCache {
   /// Creates a new journal that omits redundant information. This replaces the
   /// current journal if it exists.
   Future<void> _rebuildJournal() async {
-    _assertLock();
     await _journalWriter?.close();
     await fileSystem.write(journalFileTmp, (sink) async {
       await sink.writeLine(_kMagic);
@@ -359,12 +354,12 @@ class DiskCache {
           await sink.writeLine('$_kClean ${entry.key} ${entry.getLengths()}');
         }
       }
-    });
+    }, recursive: true);
 
     if (await fileSystem.exists(journalFile)) {
       await fileSystem.atomicMove(journalFile, journalFileBackup);
       await fileSystem.atomicMove(journalFileTmp, journalFile);
-      await fileSystem.deleteIfExists(journalFileBackup);
+      await fileSystem.delete(journalFileBackup);
     } else {
       await fileSystem.atomicMove(journalFileTmp, journalFile);
     }
@@ -460,8 +455,6 @@ class DiskCache {
       _lock.synchronized(() => _initialize().then((value) => _size));
 
   Future<void> _completeEdit(Editor editor, bool success) async {
-    _assertLock();
-
     final entry = editor._entry;
     if (entry.currentEditor != editor) throw StateError('invalid editor');
 
@@ -495,7 +488,7 @@ class DiskCache {
           _size += -oldLength + newLength;
         }
       } else {
-        await fileSystem.deleteIfExists(dirty);
+        await fileSystem.delete(dirty);
       }
     }
 
@@ -527,7 +520,6 @@ class DiskCache {
   /// We only rebuild the journal when it will halve the size of the journal
   /// and eliminate at least 2000 ops.
   bool _journalRebuildRequired() {
-    _assertLock();
     const redundantOpCompactThreshold = 2000;
     return _redundantOpCount >= redundantOpCompactThreshold &&
         _redundantOpCount >= _lruEntries.length;
@@ -551,8 +543,6 @@ class DiskCache {
       });
 
   Future<bool> _removeEntry(Entry entry) async {
-    _assertLock();
-
     // If we can't delete files that are still open, mark this entry as a zombie
     // so its files will be deleted when those files are closed.
     if (!_civilizedFileSystem) {
@@ -571,7 +561,7 @@ class DiskCache {
     await entry.currentEditor?._detach();
 
     for (var i = 0; i < valueCount; i++) {
-      await fileSystem.deleteIfExists(entry.getCleanFile(i));
+      await fileSystem.delete(entry.getCleanFile(i));
       _size -= entry.lengths[i];
       entry.lengths[i] = 0;
     }
@@ -617,8 +607,6 @@ class DiskCache {
       });
 
   Future<void> _trimToSize() async {
-    _assertLock();
-
     while (_maxSize != null && _size > _maxSize!) {
       if (!await _removeOldestEntry()) return;
     }
@@ -644,8 +632,6 @@ class DiskCache {
       _lock.synchronized(() => _delete().then((value) => _closed = true));
 
   Future<void> _delete() async {
-    _assertLock();
-
     for (final entry in _lruEntries.values) {
       // Prevent the edit from completing normally.
       await entry.currentEditor?._detach();
@@ -655,7 +641,7 @@ class DiskCache {
     await _journalWriter?.close();
     _journalWriter = null;
 
-    await fileSystem.deleteIfExists(directory);
+    await fileSystem.delete(directory);
 
     _size = 0;
     _redundantOpCount = 0;
@@ -673,10 +659,6 @@ class DiskCache {
         }
         _mostRecentTrimFailed = false;
       });
-
-  void _assertLock() {
-    assert(_lock.inLock);
-  }
 
   void _checkNotClosed() {
     if (_closed) throw StateError('cache is closed');
@@ -754,8 +736,6 @@ class Editor {
   /// and prevent new files from being created. Note that once an editor has
   /// been detached it is possible for another editor to edit the entry.
   Future<void> _detach() async {
-    _cache._assertLock();
-
     if (_entry.currentEditor == this) {
       if (_cache._civilizedFileSystem) {
         await _cache._completeEdit(this, false); // Delete it now.
@@ -775,7 +755,7 @@ class Editor {
         return null;
       }
       try {
-        return await _cache.fileSystem.source(_entry.getCleanFile(index));
+        return await _cache.fileSystem.openSource(_entry.getCleanFile(index));
       } on FileSystemException {
         return null;
       }
@@ -797,7 +777,7 @@ class Editor {
       final dirtyFile = _entry.getDirtyFile(index);
       final Sink sink;
       try {
-        sink = await _cache.fileSystem.sink(dirtyFile);
+        sink = await _cache.fileSystem.openSink(dirtyFile, recursive: true);
       } on FileSystemException {
         return BlackHoleSink();
       }
@@ -908,8 +888,6 @@ class Entry {
   /// guarantee that we see a single published snapshot. If we opened streams
   /// lazily then the streams could come from different edits.
   Future<Snapshot?> snapshot() async {
-    _cache._assertLock();
-
     if (!readable) return null;
     if (!_cache._civilizedFileSystem && (currentEditor != null || zombie)) {
       return null;
@@ -939,7 +917,7 @@ class Entry {
   }
 
   Future<Source> _newSource(int index) async {
-    final source = await fileSystem.source(getCleanFile(index));
+    final source = await fileSystem.openSource(getCleanFile(index));
     if (_cache._civilizedFileSystem) return source;
 
     lockingSourceCount++;
