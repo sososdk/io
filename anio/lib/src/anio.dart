@@ -22,3 +22,53 @@ class EOFException implements IOException {}
 check(bool closed, [String? message]) {
   if (!closed) throw StateError(message ?? '');
 }
+
+/// Object use `close` method.
+extension CloseExtension<T extends dynamic> on T {
+  FutureOr<R> use<R>(
+    FutureOr<R> Function(T closable) block, [
+    FutureOr<void> Function()? close,
+  ]) async {
+    try {
+      final result = block(this);
+      if (result is Future) {
+        return await result;
+      } else {
+        return result;
+      }
+    } finally {
+      final result = safeClose(close);
+      if (result is Future) await result;
+    }
+  }
+
+  FutureOr<void> safeClose([FutureOr<void> Function()? close]) async {
+    try {
+      close ??= this.close();
+      if (close == null) return;
+      final result = close();
+      if (result is Future) await result;
+    } catch (_) {}
+  }
+}
+
+extension FutureCloseExtension<T extends dynamic> on Future<T> {
+  Future<R> use<R>(
+    FutureOr<R> Function(T closable) block, {
+    FutureOr<void> Function()? close,
+  }) {
+    return then((closable) async {
+      try {
+        final result = block(closable);
+        if (result is Future) {
+          return await result;
+        } else {
+          return result;
+        }
+      } finally {
+        final result = (closable as Object).safeClose(close);
+        if (result is Future) await result;
+      }
+    });
+  }
+}

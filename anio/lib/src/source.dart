@@ -1,8 +1,8 @@
 part of 'anio.dart';
 
 abstract interface class Source {
-  /// Remove [count] bytes from this and appends them to [sink]. Returns
-  /// the number of bytes read.
+  /// Removes at least 1, and up to [count] bytes from this and appends them to [sink]. Returns
+  /// the number of bytes read, or 0 if this source is exhausted.
   FutureOr<int> read(Buffer sink, int count);
 
   /// Closes this source and releases the resources held by this source. It is
@@ -161,7 +161,7 @@ abstract interface class BufferedSource implements Source {
 class ForwardingSource implements Source {
   final Source delegate;
 
-  ForwardingSource(this.delegate);
+  const ForwardingSource(this.delegate);
 
   @override
   FutureOr<int> read(Buffer sink, int count) => delegate.read(sink, count);
@@ -187,15 +187,13 @@ class _RealBufferedSource implements BufferedSource {
   FutureOr<int> read(Buffer sink, int count) async {
     assert(count >= 0);
     check(!_closed, 'closed');
-    int totalBytes = 0;
-    while (totalBytes < count) {
-      if (_buffer.isEmpty) {
-        final count = await _source.read(_buffer, kBlockSize);
-        if (count == 0) return totalBytes;
-      }
-      totalBytes += _buffer.read(sink, min(_buffer.length, count - totalBytes));
+
+    if (_buffer.isEmpty) {
+      final result = await _source.read(buffer, kBlockSize);
+      if (result == 0) return 0;
     }
-    return totalBytes;
+
+    return buffer.read(sink, min(count, buffer.length));
   }
 
   @override

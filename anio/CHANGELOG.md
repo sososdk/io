@@ -1,6 +1,8 @@
-## 1.0.1
+## 1.1.0
 
-- Add readUint* and writeUint* methods
+- Add `use` to close io.
+- Add `FileHandle` to handle file operations.
+- Optimize `StreamSource` and `StreamSink`.
 
 ## 1.0.0
 

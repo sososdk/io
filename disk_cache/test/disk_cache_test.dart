@@ -7,8 +7,6 @@ import 'package:disk_cache/disk_cache.dart';
 import 'package:file_system/file_system.dart';
 import 'package:test/test.dart';
 
-import 'closeable.dart';
-
 Future<void> main() async {
   final magic = 'so.io.DiskCache';
   final version = 1;

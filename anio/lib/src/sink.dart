@@ -77,7 +77,7 @@ abstract interface class BufferedSink implements Sink {
 class ForwardingSink implements Sink {
   final Sink delegate;
 
-  ForwardingSink(this.delegate);
+  const ForwardingSink(this.delegate);
 
   @override
   FutureOr<void> write(Buffer source, int count) =>
@@ -254,14 +254,14 @@ class _RealBufferedSink implements BufferedSink {
   @override
   FutureOr<int> writeSource(Source source) async {
     check(!_closed, 'closed');
-    int total = 0;
+    int totalBytesRead = 0;
     while (true) {
-      final read = await source.read(_buffer, kBlockSize);
-      if (read == 0) break;
-      total += read;
+      final result = await source.read(_buffer, kBlockSize);
+      if (result == 0) break;
+      totalBytesRead += result;
+      await emit();
     }
-    await emit();
-    return total;
+    return totalBytesRead;
   }
 
   @override

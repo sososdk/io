@@ -151,12 +151,12 @@ class _FileHandleSource implements Source {
     final buffer = Uint8List(kBlockSize);
     int totalBytesRead = 0;
     while (totalBytesRead < count) {
-      final readCount = await fileHandle._readNoCloseCheck(
-          _position, buffer, 0, min(kBlockSize, count));
-      if (readCount == 0) return totalBytesRead;
-      _position += readCount;
-      totalBytesRead += readCount;
-      sink.writeBytes(buffer, 0, readCount);
+      final result = await fileHandle._readNoCloseCheck(
+          _position, buffer, 0, min(kBlockSize, count - totalBytesRead));
+      if (result == 0) return totalBytesRead;
+      _position += result;
+      totalBytesRead += result;
+      sink.writeBytes(buffer, 0, result);
     }
     return totalBytesRead;
   }

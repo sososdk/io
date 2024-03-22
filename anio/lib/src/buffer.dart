@@ -130,7 +130,7 @@ class Buffer implements BufferedSource, BufferedSink {
   }
 
   @override
-  FutureOr<int> readUint8() {
+  int readUint8() {
     return readBytes(1).buffer.asByteData().getUint8(0);
   }
 
@@ -141,7 +141,7 @@ class Buffer implements BufferedSource, BufferedSink {
   }
 
   @override
-  FutureOr<int> readUint16([Endian endian = Endian.big]) {
+  int readUint16([Endian endian = Endian.big]) {
     if (_length < 2) throw EOFException();
     return readBytes(2).buffer.asByteData().getUint16(0, endian);
   }
@@ -153,7 +153,7 @@ class Buffer implements BufferedSource, BufferedSink {
   }
 
   @override
-  FutureOr<int> readUint32([Endian endian = Endian.big]) {
+  int readUint32([Endian endian = Endian.big]) {
     if (_length < 4) throw EOFException();
     return readBytes(4).buffer.asByteData().getUint32(0, endian);
   }
@@ -165,7 +165,7 @@ class Buffer implements BufferedSource, BufferedSink {
   }
 
   @override
-  FutureOr<int> readUint64([Endian endian = Endian.big]) {
+  int readUint64([Endian endian = Endian.big]) {
     if (_length < 8) throw EOFException();
     return readBytes(8).buffer.asByteData().getUint64(0, endian);
   }
@@ -254,13 +254,13 @@ class Buffer implements BufferedSource, BufferedSink {
 
   @override
   FutureOr<int> writeSource(Source source) async {
-    int total = 0;
+    int totalBytesRead = 0;
     while (true) {
-      final read = await source.read(this, kBlockSize);
-      if (read == 0) break;
-      total += read;
+      final result = await source.read(this, kBlockSize);
+      if (result == 0) break;
+      totalBytesRead += result;
     }
-    return total;
+    return totalBytesRead;
   }
 
   @override
@@ -285,7 +285,7 @@ class Buffer implements BufferedSource, BufferedSink {
   }
 
   @override
-  FutureOr<void> writeUint8(int value) {
+  void writeUint8(int value) {
     writeBytes((ByteData(1)..setUint8(0, value)).buffer.asUint8List());
   }
 
@@ -295,7 +295,7 @@ class Buffer implements BufferedSource, BufferedSink {
   }
 
   @override
-  FutureOr<void> writeUint16(int value, [Endian endian = Endian.big]) {
+  void writeUint16(int value, [Endian endian = Endian.big]) {
     writeBytes((ByteData(2)..setUint16(0, value, endian)).buffer.asUint8List());
   }
 
@@ -305,7 +305,7 @@ class Buffer implements BufferedSource, BufferedSink {
   }
 
   @override
-  FutureOr<void> writeUint32(int value, [Endian endian = Endian.big]) {
+  void writeUint32(int value, [Endian endian = Endian.big]) {
     writeBytes((ByteData(4)..setUint32(0, value, endian)).buffer.asUint8List());
   }
 
@@ -315,7 +315,7 @@ class Buffer implements BufferedSource, BufferedSink {
   }
 
   @override
-  FutureOr<void> writeUint64(int value, [Endian endian = Endian.big]) {
+  void writeUint64(int value, [Endian endian = Endian.big]) {
     writeBytes((ByteData(8)..setUint64(0, value, endian)).buffer.asUint8List());
   }
 

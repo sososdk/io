@@ -293,12 +293,11 @@ void main() {
 
       expect(await source.read(sink, 2), 2);
       expect(await source.read(sink, 100), 100);
-      final remaining = total - 100 - 2;
-      expect(await source.read(sink, total), remaining);
-      expect(await source.read(sink, 1), 0);
+      expect(await source.read(sink, total), kBlockSize - 100 - 2);
+      expect(await source.read(sink, 1), 1);
 
       expect(buffer.length, 0);
-      expect(sink.length, total);
+      expect(sink.length, kBlockSize + 1);
     });
 
     test('exhausted', () async {
