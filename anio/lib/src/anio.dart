@@ -44,31 +44,19 @@ extension CloseExtension<T extends dynamic> on T {
 
   FutureOr<void> safeClose([FutureOr<void> Function()? close]) async {
     try {
-      close ??= this.close();
-      if (close == null) return;
-      final result = close();
+      final function = close ?? this?.close;
+      if (function == null) return;
+      final result = function();
       if (result is Future) await result;
     } catch (_) {}
   }
 }
 
 extension FutureCloseExtension<T extends dynamic> on Future<T> {
-  Future<R> use<R>(
+  Future<R> use<R extends dynamic>(
     FutureOr<R> Function(T closable) block, {
     FutureOr<void> Function()? close,
-  }) {
-    return then((closable) async {
-      try {
-        final result = block(closable);
-        if (result is Future) {
-          return await result;
-        } else {
-          return result;
-        }
-      } finally {
-        final result = (closable as Object).safeClose(close);
-        if (result is Future) await result;
-      }
-    });
+  }) async {
+    return ((await this) as Object?).use((e) => block(e as T), close);
   }
 }
