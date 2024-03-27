@@ -11,14 +11,14 @@ class FileHandle {
   var _openCount = 0;
 
   Future<Sink> sink([int? position]) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     position ??= await randomAccessFile.position();
     _openCount++;
     return _FileHandleSink(this, position);
   }
 
   Sink sinkSync([int? position]) {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     position ??= randomAccessFile.positionSync();
     _openCount++;
     return _FileHandleSink(this, position);
@@ -26,7 +26,7 @@ class FileHandle {
 
   Future<void> write(int position, List<int> buffer,
       [int start = 0, int? end]) {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     return _writeNoCloseCheck(position, buffer, start, end);
   }
 
@@ -38,21 +38,21 @@ class FileHandle {
   }
 
   Future<Source> source([int? position]) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     position ??= await randomAccessFile.position();
     _openCount++;
     return _FileHandleSource(this, position);
   }
 
   Source sourceSync([int? position]) {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     position ??= randomAccessFile.positionSync();
     _openCount++;
     return _FileHandleSource(this, position);
   }
 
   Future<int> read(int position, List<int> buffer, [int start = 0, int? end]) {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     return _readNoCloseCheck(position, buffer, start, end);
   }
 
@@ -64,17 +64,17 @@ class FileHandle {
   }
 
   Future<void> truncate(int length) {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     return _lock.synchronized(() => randomAccessFile.truncate(length));
   }
 
   Future<int> length() {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     return _lock.synchronized(() => randomAccessFile.length());
   }
 
   Future<void> flush() {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     return _lock.synchronized(() => randomAccessFile.flush());
   }
 
@@ -103,7 +103,7 @@ class _FileHandleSink implements Sink {
 
   @override
   FutureOr<void> write(Buffer source, int count) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     while (count > 0) {
       if (source.isEmpty) return;
       final chunk = source._chunks.removeAt(0);
@@ -124,7 +124,7 @@ class _FileHandleSink implements Sink {
 
   @override
   FutureOr<void> flush() {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     return fileHandle.flush();
   }
 
@@ -147,7 +147,7 @@ class _FileHandleSource implements Source {
 
   @override
   FutureOr<int> read(Buffer sink, int count) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     final buffer = Uint8List(kBlockSize);
     int totalBytesRead = 0;
     while (totalBytesRead < count) {

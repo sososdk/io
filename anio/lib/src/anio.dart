@@ -19,8 +19,12 @@ const int kBlockSize = 8192;
 
 class EOFException implements IOException {}
 
-check(bool closed, [String? message]) {
-  if (!closed) throw StateError(message ?? '');
+void checkState(bool value, [String? message]) {
+  if (!value) throw StateError(message ?? '');
+}
+
+void checkArgument(bool value, [String? message]) {
+  if (!value) throw ArgumentError(message ?? '');
 }
 
 /// Object use `close` method.

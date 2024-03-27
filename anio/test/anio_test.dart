@@ -107,7 +107,7 @@ void main() {
       buffer.skip(1);
       final bytes = buffer.readBytes(10);
       expect(bytes.toString(), '[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]');
-      buffer.readBytes(300);
+      buffer.readBytes(300 - 1 - 10);
       expect(buffer.length, 0);
     });
 

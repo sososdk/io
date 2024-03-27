@@ -1,6 +1,10 @@
-## 1.1.1
+## 1.1.2
 
-- Fix 
+- When specifying the length, check whether the length is satisfied.
+
+- ## 1.1.1
+
+- Fix `use` bugs.
 
 ## 1.1.0
 

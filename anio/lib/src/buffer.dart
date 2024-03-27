@@ -34,7 +34,7 @@ class Buffer implements BufferedSource, BufferedSink {
 
   @override
   int read(Buffer sink, int count) {
-    assert(count >= 0);
+    checkArgument(count >= 0, 'count < 0: $count');
     if (_length == 0) return 0;
     if (count > _length) count = _length;
     sink.write(this, count);
@@ -70,7 +70,7 @@ class Buffer implements BufferedSource, BufferedSink {
 
   @override
   int indexOf(int element, [int start = 0, int? end]) {
-    assert(end == null || start < end);
+    checkArgument(end == null || start <= end, 'start > end: $start > $end');
     if (end == null) {
       end = _length;
     } else if (end > _length) {
@@ -116,7 +116,8 @@ class Buffer implements BufferedSource, BufferedSink {
 
   @override
   Uint8List readBytes([int? count]) {
-    assert(count == null || count >= 0);
+    checkArgument(count == null || count >= 0, 'count < 0: $count');
+    if (count != null) require(count);
     count ??= _length;
     final sink = Uint8List(min(count, _length));
     readIntoBytes(sink);
@@ -125,7 +126,6 @@ class Buffer implements BufferedSource, BufferedSink {
 
   @override
   int readInt8() {
-    if (isEmpty) throw EOFException();
     return readBytes(1).buffer.asByteData().getInt8(0);
   }
 
@@ -136,60 +136,47 @@ class Buffer implements BufferedSource, BufferedSink {
 
   @override
   int readInt16([Endian endian = Endian.big]) {
-    if (_length < 2) throw EOFException();
     return readBytes(2).buffer.asByteData().getInt16(0, endian);
   }
 
   @override
   int readUint16([Endian endian = Endian.big]) {
-    if (_length < 2) throw EOFException();
     return readBytes(2).buffer.asByteData().getUint16(0, endian);
   }
 
   @override
   int readInt32([Endian endian = Endian.big]) {
-    if (_length < 4) throw EOFException();
     return readBytes(4).buffer.asByteData().getInt32(0, endian);
   }
 
   @override
   int readUint32([Endian endian = Endian.big]) {
-    if (_length < 4) throw EOFException();
     return readBytes(4).buffer.asByteData().getUint32(0, endian);
   }
 
   @override
   int readInt64([Endian endian = Endian.big]) {
-    if (_length < 8) throw EOFException();
     return readBytes(8).buffer.asByteData().getInt64(0, endian);
   }
 
   @override
   int readUint64([Endian endian = Endian.big]) {
-    if (_length < 8) throw EOFException();
     return readBytes(8).buffer.asByteData().getUint64(0, endian);
   }
 
   @override
   double readFloat32([Endian endian = Endian.big]) {
-    if (_length < 4) throw EOFException();
     return readBytes(4).buffer.asByteData().getFloat32(0, endian);
   }
 
   @override
   double readFloat64([Endian endian = Endian.big]) {
-    if (_length < 8) throw EOFException();
     return readBytes(8).buffer.asByteData().getFloat64(0, endian);
   }
 
   @override
   String readString({Encoding encoding = utf8, int? count}) {
-    assert(count == null || count >= 0);
-    count ??= _length;
-    if (isEmpty) return '';
-    final sink = Uint8List(min(_length, count));
-    readIntoBytes(sink);
-    return encoding.decode(sink);
+    return encoding.decode(readBytes(count));
   }
 
   @override
@@ -216,7 +203,6 @@ class Buffer implements BufferedSource, BufferedSink {
   }
 
   String _readLine(Encoding encoding, int newline) {
-    assert(newline >= 0);
     String result;
     if (newline > 0 && this[newline - 1] == kCR) {
       // Read everything until '\r\n', then skip the '\r\n'.
@@ -232,8 +218,8 @@ class Buffer implements BufferedSource, BufferedSink {
 
   @override
   void write(Buffer source, int count) {
-    assert(source != this);
-    RangeError.checkValueInInterval(count, 0, source.length);
+    checkArgument(source != this, 'source == this');
+    RangeError.checkValueInInterval(count, 0, source._length);
     while (count > 0) {
       if (source.isEmpty) return;
       final chunk = source._chunks.removeAt(0);
@@ -347,7 +333,7 @@ class Buffer implements BufferedSource, BufferedSink {
   }
 
   Uint8List asBytes([int? count]) {
-    assert(count == null || count >= 0);
+    checkArgument(count == null || count >= 0, 'count < 0: $count');
     count ??= _length;
     if (_length == 0) return Uint8List(0);
     final sink = Uint8List(min(count, _length));

@@ -186,7 +186,7 @@ class _RealBufferedSource implements BufferedSource {
   @override
   FutureOr<int> read(Buffer sink, int count) async {
     assert(count >= 0);
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
 
     if (_buffer.isEmpty) {
       final result = await _source.read(buffer, kBlockSize);
@@ -198,14 +198,14 @@ class _RealBufferedSource implements BufferedSource {
 
   @override
   FutureOr<bool> exhausted() async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     return _buffer.exhausted() && await _source.read(_buffer, kBlockSize) == 0;
   }
 
   @override
   FutureOr<bool> request(int count) async {
     assert(count >= 0);
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     while (_buffer.length < count) {
       if (await _source.read(_buffer, kBlockSize) == 0) return false;
     }
@@ -219,7 +219,7 @@ class _RealBufferedSource implements BufferedSource {
 
   @override
   FutureOr<void> skip(int count) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     while (count > 0) {
       if (_buffer.isEmpty && await _source.read(_buffer, kBlockSize) == 0) {
         throw EOFException();
@@ -232,7 +232,7 @@ class _RealBufferedSource implements BufferedSource {
 
   @override
   FutureOr<int> indexOf(int element, [int start = 0, int? end]) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     assert(end == null || start < end);
     while (end == null || start < end) {
       final result = _buffer.indexOf(element, start, end);
@@ -436,7 +436,7 @@ class _StreamSource implements Source {
 
   @override
   Future<int> read(Buffer sink, int count) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     _subscription.resume();
     while (_receiveBuffer.isEmpty) {
       if (_done) {

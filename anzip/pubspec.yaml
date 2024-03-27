@@ -11,7 +11,7 @@ dependencies:
   path: '>=1.8.0 <2.0.0'
   collection: '>=1.18.0 <2.0.0'
   pointycastle: '>=3.7.4 <4.0.0'
-  anio: ^1.1.1
+  anio: ^1.1.2
 
 dev_dependencies:
   lints: ^3.0.0

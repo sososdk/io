@@ -163,70 +163,70 @@ class _RealBufferedSink implements BufferedSink {
 
   @override
   FutureOr<void> write(Buffer source, int count) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     _buffer.write(source, count);
     await emit();
   }
 
   @override
   FutureOr<void> writeBytes(Uint8List source, [int start = 0, int? end]) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     _buffer.writeBytes(source, start, end);
     await emit();
   }
 
   @override
   FutureOr<void> writeInt8(int value) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     _buffer.writeInt8(value);
     await emit();
   }
 
   @override
   FutureOr<void> writeUint8(int value) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     _buffer.writeUint8(value);
     await emit();
   }
 
   @override
   FutureOr<void> writeInt16(int value, [Endian endian = Endian.big]) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     _buffer.writeInt16(value, endian);
     await emit();
   }
 
   @override
   FutureOr<void> writeUint16(int value, [Endian endian = Endian.big]) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     _buffer.writeUint16(value, endian);
     await emit();
   }
 
   @override
   FutureOr<void> writeInt32(int value, [Endian endian = Endian.big]) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     _buffer.writeInt32(value, endian);
     await emit();
   }
 
   @override
   FutureOr<void> writeUint32(int value, [Endian endian = Endian.big]) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     _buffer.writeUint32(value, endian);
     await emit();
   }
 
   @override
   FutureOr<void> writeInt64(int value, [Endian endian = Endian.big]) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     _buffer.writeInt64(value, endian);
     await emit();
   }
 
   @override
   FutureOr<void> writeUint64(int value, [Endian endian = Endian.big]) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     _buffer.writeUint64(value, endian);
     await emit();
   }
@@ -236,7 +236,7 @@ class _RealBufferedSink implements BufferedSink {
     double value, [
     Endian endian = Endian.big,
   ]) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     _buffer.writeFloat32(value, endian);
     await emit();
   }
@@ -246,14 +246,14 @@ class _RealBufferedSink implements BufferedSink {
     double value, [
     Endian endian = Endian.big,
   ]) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     _buffer.writeFloat64(value, endian);
     await emit();
   }
 
   @override
   FutureOr<int> writeSource(Source source) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     int totalBytesRead = 0;
     while (true) {
       final result = await source.read(_buffer, kBlockSize);
@@ -266,7 +266,7 @@ class _RealBufferedSink implements BufferedSink {
 
   @override
   FutureOr<void> writeString(String string, [Encoding encoding = utf8]) async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     _buffer.writeString(string, encoding);
     await emit();
   }
@@ -283,7 +283,7 @@ class _RealBufferedSink implements BufferedSink {
 
   @override
   FutureOr<void> emit() async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     if (_buffer.isNotEmpty) {
       await _sink.write(_buffer, _buffer.length);
     }
@@ -291,7 +291,7 @@ class _RealBufferedSink implements BufferedSink {
 
   @override
   FutureOr<void> flush() async {
-    check(!_closed, 'closed');
+    checkState(!_closed, 'closed');
     if (_buffer.isNotEmpty) {
       await _sink.write(_buffer, _buffer.length);
     }
