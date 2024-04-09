@@ -113,12 +113,58 @@ void main() {
 
     test('as bytes', () {
       final buffer = Buffer();
-      final ints = List.generate(300, (i) => i);
-      buffer.writeBytes(ints);
+      buffer.writeBytes(List.generate(4, (i) => i));
+      buffer.writeBytes(List.generate(4, (i) => i * 2));
+      buffer.writeBytes(List.generate(4, (i) => i * 4));
+      buffer.writeBytes(List.generate(4, (i) => i * 8));
 
-      expect(buffer.asBytes(10).length, 10);
-      expect(buffer.asBytes().length, 300);
-      expect(buffer.length, 300);
+      expect(buffer.asBytes(0, 3).toString(), '[0, 1, 2]');
+      expect(buffer.asBytes(2, 3).toString(), '[2]');
+      expect(buffer.asBytes(3, 4).toString(), '[3]');
+      expect(buffer.asBytes(0, 4).toString(), '[0, 1, 2, 3]');
+
+      expect(buffer.asBytes(4, 7).toString(), '[0, 2, 4]');
+      expect(buffer.asBytes(6, 7).toString(), '[4]');
+      expect(buffer.asBytes(7, 8).toString(), '[6]');
+      expect(buffer.asBytes(4, 8).toString(), '[0, 2, 4, 6]');
+
+      expect(buffer.asBytes(8, 11).toString(), '[0, 4, 8]');
+      expect(buffer.asBytes(10, 11).toString(), '[8]');
+      expect(buffer.asBytes(11, 12).toString(), '[12]');
+      expect(buffer.asBytes(8, 12).toString(), '[0, 4, 8, 12]');
+
+      expect(buffer.asBytes(12, 15).toString(), '[0, 8, 16]');
+      expect(buffer.asBytes(14, 15).toString(), '[16]');
+      expect(buffer.asBytes(15, 16).toString(), '[24]');
+      expect(buffer.asBytes(12, 16).toString(), '[0, 8, 16, 24]');
+
+      expect(buffer.asBytes(2, 6).toString(), '[2, 3, 0, 2]');
+      expect(buffer.asBytes(2, 10).toString(), '[2, 3, 0, 2, 4, 6, 0, 4]');
+      expect(buffer.asBytes(2, 14).toString(),
+          '[2, 3, 0, 2, 4, 6, 0, 4, 8, 12, 0, 8]');
+
+      expect(buffer.asBytes(2, 4).toString(), '[2, 3]');
+      expect(buffer.asBytes(2, 8).toString(), '[2, 3, 0, 2, 4, 6]');
+      expect(
+          buffer.asBytes(2, 12).toString(), '[2, 3, 0, 2, 4, 6, 0, 4, 8, 12]');
+      expect(buffer.asBytes(2, 16).toString(),
+          '[2, 3, 0, 2, 4, 6, 0, 4, 8, 12, 0, 8, 16, 24]');
+      expect(() => buffer.asBytes(2, 20), throwsA(isA<RangeError>()));
+
+      expect(buffer.asBytes(6, 6).toString(), '[]');
+      expect(buffer.asBytes(6, 10).toString(), '[4, 6, 0, 4]');
+      expect(buffer.asBytes(6, 14).toString(), '[4, 6, 0, 4, 8, 12, 0, 8]');
+
+      expect(() => buffer.asBytes(10, 6), throwsA(isA<RangeError>()));
+      expect(buffer.asBytes(10, 10).toString(), '[]');
+      expect(buffer.asBytes(10, 14).toString(), '[8, 12, 0, 8]');
+
+      expect(() => buffer.asBytes(14, 6), throwsA(isA<RangeError>()));
+      expect(() => buffer.asBytes(14, 10), throwsA(isA<RangeError>()));
+      expect(buffer.asBytes(14, 14).toString(), '[]');
+
+      expect(buffer.asBytes().length, 16);
+      expect(buffer.length, 16);
     });
 
     test('write and read', () async {

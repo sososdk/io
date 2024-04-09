@@ -332,22 +332,26 @@ class Buffer implements BufferedSource, BufferedSink {
     writeString(String.fromCharCode(charCode));
   }
 
-  Uint8List asBytes([int? count]) {
-    checkArgument(count == null || count >= 0, 'count < 0: $count');
-    count ??= _length;
-    if (_length == 0) return Uint8List(0);
-    final sink = Uint8List(min(count, _length));
-    int offset = 0;
+  Uint8List asBytes([int start = 0, int? end]) {
+    end = RangeError.checkValidRange(start, end, _length);
+    final sink = <int>[];
+    var offset = 0;
     for (var chunk in _chunks) {
-      if (offset + chunk.length >= count) {
-        sink.setRange(offset, count, chunk);
-        break;
+      final temp = offset + chunk.length;
+      if (temp < start) {
+        offset = temp;
       } else {
-        sink.setRange(offset, offset + chunk.length, chunk);
-        offset += chunk.length;
+        final chunkStart = max(0, start - offset);
+        if (temp <= end) {
+          sink.addAll(chunk.sublist(chunkStart));
+          offset = temp;
+        } else {
+          sink.addAll(chunk.sublist(chunkStart, chunk.length - (temp - end)));
+          break;
+        }
       }
     }
-    return sink;
+    return Uint8List.fromList(sink);
   }
 
   void copyTo(Buffer buffer, [int start = 0, int? end]) {

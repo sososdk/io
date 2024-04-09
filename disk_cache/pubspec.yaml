@@ -10,7 +10,7 @@ dependencies:
   logging: '>=1.0.2 <2.0.0'
   path: '>=1.8.0 <2.0.0'
   meta: '>=1.7.0 <2.0.0'
-  anio: ^1.1.2
+  anio: ^1.1.3
   file_system: ^1.0.2
   synchronizer: ^1.0.1
 
