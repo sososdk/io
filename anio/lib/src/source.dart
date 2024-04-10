@@ -121,6 +121,11 @@ abstract interface class BufferedSource implements Source {
   /// Removes eight bytes from this source.
   ///
   /// The return value will be between 0 and  2<sup>64</sup> - 1, inclusive.
+  ///
+  /// If you need 64-bit unsigned numbers, you need to use `BigInt`:
+  /// ```dart
+  /// BigInt.from(readUint64()).toUnsigned(64)
+  /// ```
   FutureOr<int> readUint64([Endian endian = Endian.big]);
 
   /// Removes four bytes from this source.
