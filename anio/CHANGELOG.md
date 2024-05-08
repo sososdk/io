@@ -1,3 +1,7 @@
+## 2.0.1
+
+- Add nullable extension.
+
 ## 2.0.0
 
 - Break change.

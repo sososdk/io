@@ -20,6 +20,14 @@ extension FutureFileHandleExtension on Future<FileHandle> {
   Future<Source> source([int position = 0]) => then((e) => e.source(position));
 }
 
+extension NullableFutureFileHandleExtension on Future<FileHandle?> {
+  Future<Sink?> sink([int position = 0]) => then((e) => e?.sink(position));
+
+  Future<Source?> source([int position = 0]) {
+    return then((e) => e?.source(position));
+  }
+}
+
 class FileHandle {
   FileHandle._(this.file);
 

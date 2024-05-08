@@ -1,6 +1,6 @@
 name: anio
 description: Anio is a library that complements `dart:io` to make it much easier to access, store, and process your data.
-version: 2.0.0
+version: 2.0.1
 homepage: https://github.com/sososdk/io/tree/master/anio
 
 environment:

@@ -468,7 +468,11 @@ extension SourceBuffer on Source {
 }
 
 extension FutureSourceBuffer on Future<Source> {
-  Future<RealBufferedSource> buffered() async => RealBufferedSource(await this);
+  Future<RealBufferedSource> buffered() => then((e) => e.buffered());
+}
+
+extension NullableFutureSourceBuffer on Future<Source?> {
+  Future<RealBufferedSource?> buffered() => then((e) => e?.buffered());
 }
 
 class ForwardingSource implements Source {
