@@ -30,7 +30,7 @@ class ZipFile {
   }) async {
     if (await file.length() <= 0) throw ZipException('zip file is empty');
 
-    return FileHandle(await file.open()).use((closable) async {
+    return await file.openHandle().use((closable) async {
       final reader = FileHeaderReader(closable, encoding);
       final model = await reader.parse();
       return ZipFile(file, model, encoding: encoding, password: password);
@@ -57,7 +57,7 @@ class ZipFile {
       } else {
         randomAccessFile = await _file.open();
       }
-      return FileHandle(randomAccessFile);
+      return randomAccessFile.handle();
     }();
   }
 
@@ -75,12 +75,12 @@ class ZipFile {
   Future<BufferedSource> _source(FileHeader header) => _handleFuture.then((e) {
         int position = 0;
         if (splitArchive) {
-          final file = e.randomAccessFile as SplitRandomAccessFile;
+          final file = e.file as SplitRandomAccessFile;
           final splitLength = file.splitLength;
           position = header.diskNumberStart * splitLength;
         }
         position += header.offsetLocalHeader;
-        return e.source(position).buffer();
+        return e.source(position).buffered();
       });
 
   Future<Source?> getEntrySource(FileHeader fileHeader, [String? password]) {

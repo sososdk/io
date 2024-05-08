@@ -1,12 +1,12 @@
-import 'dart:typed_data';
-
 class Crc32 {
+  Crc32([this.crc = 0]);
+
   int crc = 0;
 
-  void update(Uint8List bytes, [int start = 0, int? end]) {
+  void update(List<int> bytes, [int start = 0, int? end]) {
     crc = crc ^ 0xffffffff;
-    for (var element in bytes) {
-      crc = crc32(crc, element);
+    for (var i = start; i < (end ?? bytes.length); i++) {
+      crc = crc32(crc, bytes[i]);
     }
     crc = crc ^ 0xffffffff;
   }

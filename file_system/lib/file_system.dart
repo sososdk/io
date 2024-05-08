@@ -40,7 +40,7 @@ extension FileSystemShortcuts on FileSystem {
     bool recursive = false,
   }) {
     return sink(path, mode: mode, recursive: recursive)
-        .buffer()
+        .buffered()
         .then((e) => () async {
               try {
                 return await block(e);
@@ -62,7 +62,7 @@ extension FileSystemShortcuts on FileSystem {
   Future<T> read<T>(
       String path, FutureOr<T> Function(BufferedSource source) block,
       [int? start, int? end]) {
-    return source(path, start, end).buffer().then((e) async {
+    return source(path, start, end).buffered().then((e) async {
       try {
         return await block(e);
       } finally {
@@ -82,65 +82,32 @@ extension FileSystemShortcuts on FileSystem {
     if (recursive) {
       await directory(p.dirname(path)).create(recursive: true);
     }
-    return FileHandle(await file(path).open(mode: mode));
+    return file(path).openHandle(mode: mode);
   }
 
   Future<Sink> openSink(
     dynamic path, {
-    int? position,
-    FileMode mode = FileMode.write,
+    int position = 0,
     bool recursive = false,
   }) {
-    return open(path, mode: mode, recursive: recursive)
-        .then((e) => e.sink(position).whenComplete(() => e.close()));
+    return open(path, mode: FileMode.write, recursive: recursive).use((handle) {
+      return handle.sink(position);
+    });
   }
 
-  Future<Source> openSource(
+  Future<Sink> openAppendingSink(
     dynamic path, {
-    int? position,
-    FileMode mode = FileMode.read,
-  }) {
-    return open(path, mode: mode, recursive: false)
-        .then((e) => e.source(position).whenComplete(() => e.close()));
-  }
-
-  /// Synchronously creates a [FileHandle] to handle [path].
-  FileHandle openSync(
-    dynamic path, {
-    FileMode mode = FileMode.read,
     bool recursive = false,
   }) {
-    if (recursive) {
-      directory(p.dirname(path)).createSync(recursive: true);
-    }
-    return FileHandle(file(path).openSync(mode: mode));
+    return open(path, mode: FileMode.write, recursive: recursive).use((handle) {
+      return handle.appendingSink();
+    });
   }
 
-  Sink openSinkSync(
-    dynamic path, {
-    int? position,
-    FileMode mode = FileMode.write,
-    bool recursive = false,
-  }) {
-    final e = openSync(path, mode: mode, recursive: recursive);
-    try {
-      return e.sinkSync(position);
-    } finally {
-      e.close();
-    }
-  }
-
-  Source openSourceSync(
-    dynamic path, {
-    int? position,
-    FileMode mode = FileMode.read,
-  }) {
-    final e = openSync(path, mode: mode, recursive: false);
-    try {
-      return e.sourceSync(position);
-    } finally {
-      e.close();
-    }
+  Future<Source> openSource(dynamic path, {int position = 0}) {
+    return open(path, mode: FileMode.read, recursive: false).use((handle) {
+      return handle.source(position);
+    });
   }
 
   /// Returns a reference to a [FileSystemEntity] at [path].

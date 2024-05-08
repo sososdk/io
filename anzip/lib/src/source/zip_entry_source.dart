@@ -42,13 +42,13 @@ class _CrcCheckSource extends ForwardingSource {
   bool _verified = false;
 
   @override
-  FutureOr<int> read(Buffer sink, int count) async {
+  Future<int> read(Buffer sink, int count) async {
     final buffer = Buffer();
     final result = await super.read(buffer, count);
     if (buffer.isNotEmpty) {
       final bytes = buffer.readBytes();
       _crc32.update(bytes);
-      sink.writeBytes(bytes);
+      sink.writeFromBytes(bytes);
     } else {
       await _verify();
     }

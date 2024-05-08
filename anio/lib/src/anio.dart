@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:meta/meta.dart';
 import 'package:synchronizer/synchronizer.dart';
 
 part 'buffer.dart';
@@ -15,9 +16,17 @@ part 'source.dart';
 
 const int kLF = 10; // \n
 const int kCR = 13; // \r
+/// The size of all segments in bytes.
+@visibleForTesting
 const int kBlockSize = 8192;
 
-class EOFException implements IOException {}
+/// Segments will be shared when doing so avoids `arraycopy()` of this many bytes.
+@visibleForTesting
+const int kShareMinimum = 1024;
+
+class EOFException implements IOException {
+  const EOFException();
+}
 
 void checkState(bool value, [String? message]) {
   if (!value) throw StateError(message ?? '');
@@ -28,8 +37,8 @@ void checkArgument(bool value, [String? message]) {
 }
 
 /// Object use `close` method.
-extension CloseExtension<T extends dynamic> on T {
-  FutureOr<R> use<R>(
+extension ClosableExtension<T extends dynamic> on T {
+  Future<R> use<R>(
     FutureOr<R> Function(T closable) block, [
     FutureOr<void> Function()? close,
   ]) async {
@@ -56,11 +65,11 @@ extension CloseExtension<T extends dynamic> on T {
   }
 }
 
-extension FutureCloseExtension<T extends dynamic> on Future<T> {
-  Future<R> use<R extends dynamic>(
-    FutureOr<R> Function(T closable) block, {
+extension FutureClosableExtension<T extends dynamic> on Future<T> {
+  Future<R> use<R>(
+    FutureOr<R> Function(T closable) block, [
     FutureOr<void> Function()? close,
-  }) async {
+  ]) async {
     return ((await this) as Object?).use((e) => block(e as T), close);
   }
 }

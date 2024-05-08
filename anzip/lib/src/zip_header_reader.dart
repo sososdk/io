@@ -60,7 +60,7 @@ Future<Zip64ExtendedInfo?> _readZip64ExtendedInfo(BufferedSource source,
     if (record.header == zip64extsig) {
       if (record.size == 0) return null;
       int count = 0;
-      final buffer = Buffer()..writeBytes(Uint8List.fromList(record.data));
+      final buffer = Buffer()..writeFromBytes(Uint8List.fromList(record.data));
       int? newUncompressedSize;
       if (count < record.size && uncompressedSize == zip64sizelimit) {
         newUncompressedSize = buffer.readUint64(Endian.little);
@@ -94,7 +94,7 @@ Future<AESExtraDataRecord?> _readAesExtraDataRecord(
       if (record.size != 7) {
         throw ZipException('corrupt AES extra data records');
       }
-      final buffer = Buffer()..writeBytes(Uint8List.fromList(record.data));
+      final buffer = Buffer()..writeFromBytes(Uint8List.fromList(record.data));
       final aesVersion =
           AesVersion.fromVersionNumber(buffer.readUint16(Endian.little));
       final vendorID = buffer.readString(count: 2);
@@ -154,7 +154,7 @@ class FileHeaderReader {
 
   Future<EndOfCentralDirectoryRecord> _readEndOfCentralDirectoryRecord() async {
     final offset = await _locateOffsetOfEndOfCentralDirectory();
-    return _handle.source(offset + 4).buffer().use((e) async {
+    return _handle.source(offset + 4).buffered().use((e) async {
       return EndOfCentralDirectoryRecord(
         await e.readUint16(Endian.little),
         await e.readUint16(Endian.little),
@@ -181,7 +181,7 @@ class FileHeaderReader {
     final length = await _handle.length();
     final sig = await _handle
         .source(length - endhdr)
-        .buffer()
+        .buffered()
         .use((e) => e.readInt32(Endian.little));
     if (sig == endsig) {
       return length - endhdr;
@@ -192,7 +192,7 @@ class FileHeaderReader {
       while (numberOfBytesToRead > 0 && currentFilePointer > 0) {
         final sig = await _handle
             .source(--currentFilePointer)
-            .buffer()
+            .buffered()
             .use((e) => e.readInt32(Endian.little));
         if (sig == endsig) {
           return currentFilePointer;
@@ -214,15 +214,14 @@ class FileHeaderReader {
     // Refer to Appnote for more information
     return _handle
         .source(offsetEndOfCentralDirectory - 4 - 8 - 4 - 4)
-        .buffer()
+        .buffered()
         .use((closable) async {
       final sig = await closable.readUint32(Endian.little);
       if (sig == zip64endsig) {
-        return Zip64EndOfCentralDirectoryLocator(
-          await closable.readUint32(Endian.little),
-          await closable.readUint64(Endian.little),
-          await closable.readUint32(Endian.little),
-        );
+        final number = await closable.readUint32(Endian.little);
+        final offset = await closable.readUint64(Endian.little);
+        final total = await closable.readUint32(Endian.little);
+        return Zip64EndOfCentralDirectoryLocator(number, offset, total);
       } else {
         return null;
       }
@@ -255,7 +254,7 @@ class FileHeaderReader {
         eocdloc.offsetZip64EndOfCentralDirectoryRecord;
     return _handle
         .source(offsetStartOfZip64CentralDirectory)
-        .buffer()
+        .buffered()
         .use((closable) async {
       final sig = await closable.readUint32(Endian.little);
       if (sig == zip64censig) {
@@ -295,7 +294,7 @@ class FileHeaderReader {
       int numberOfEntriesInCentralDirectory) async {
     return _handle
         .source(offsetStartOfCentralDirectory)
-        .buffer()
+        .buffered()
         .use((closable) async {
       final headers = <FileHeader>[];
       for (var i = 0; i < numberOfEntriesInCentralDirectory; i++) {

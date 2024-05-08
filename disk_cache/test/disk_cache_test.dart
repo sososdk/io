@@ -8,13 +8,13 @@ import 'package:file_system/file_system.dart';
 import 'package:test/test.dart';
 
 Future<void> main() async {
-  final magic = 'so.io.DiskCache';
-  final version = 1;
-  final appVersion = 1;
-  final valueCount = 2;
-  final cacheDir = 'build/cache';
-  final journalFile = 'build/cache/journal';
-  final journalBkpFile = 'build/cache/journal.bkp';
+  const magic = 'so.io.DiskCache';
+  const version = 1;
+  const appVersion = 1;
+  const valueCount = 2;
+  const cacheDir = 'build/cache';
+  const journalFile = 'build/cache/journal';
+  const journalBkpFile = 'build/cache/journal.bkp';
   final fileSystem = FaultyFileSystem(const LocalFileSystem());
   final toClose = ListQueue<DiskCache>();
   late DiskCache cache;
@@ -44,7 +44,7 @@ Future<void> main() async {
     expectedLines.add('$version');
     expectedLines.add('$appVersion');
     expectedLines.add('$valueCount');
-    expectedLines.add("");
+    expectedLines.add('');
     expectedLines.addAll(expectedBodyLines);
     expect(await readJournalLines(), expectedLines);
   }
@@ -89,8 +89,8 @@ Future<void> main() async {
       fileSystem.write(path, (sink) => sink.writeString(content));
 
   Future<void> generateSomeGarbageFiles() async {
-    final dir1 = '$cacheDir/dir1';
-    final dir2 = '$dir1/dir2';
+    const dir1 = '$cacheDir/dir1';
+    const dir2 = '$dir1/dir2';
     await writeFile(getCleanFile('g1', 0), 'A');
     await writeFile(getCleanFile('g1', 1), 'B');
     await writeFile(getCleanFile('g2', 0), 'C');
@@ -169,7 +169,7 @@ Future<void> main() async {
     final creator = await cache.edit('k1').then((value) => value!);
     await creator
         .newSink(0)
-        .buffer()
+        .buffered()
         .then((value) => value.writeString('Hello'));
 
     // Simulate a severe Filesystem failure on the first initialization.
@@ -206,7 +206,7 @@ Future<void> main() async {
     // Test valid cases.
     // Exactly 120.
     key =
-        "012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
+        '012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789';
     await cache.edit(key).then((value) => value?.abort());
     // Contains all valid characters.
     key = 'abcdefghijklmnopqrstuvwxyz_0123456789';
@@ -373,7 +373,7 @@ Future<void> main() async {
     await v1Creator.commit();
 
     final snapshot1 = await cache.get('k1').then((value) => value!);
-    final inV1 = snapshot1.getSource(0).buffer();
+    final inV1 = snapshot1.getSource(0).buffered();
     expect(await inV1.readInt8(), 'A'.codeUnitAt(0));
     expect(await inV1.readInt8(), 'A'.codeUnitAt(0));
 
@@ -888,7 +888,7 @@ Future<void> main() async {
 
   test('open creates directory if necessary', () async {
     await cache.close();
-    final dir = '$cacheDir/testOpenCreatesDirectoryIfNecessary';
+    const dir = '$cacheDir/testOpenCreatesDirectoryIfNecessary';
     cache = DiskCache(fileSystem, dir,
         appVersion: appVersion, valueCount: valueCount);
     await set('a', 'a', 'a');
@@ -1000,7 +1000,7 @@ Future<void> main() async {
   });
 
   test('trim to size with active edit', () async {
-    final emulateWindows = false;
+    const emulateWindows = false;
     final windows = Platform.isWindows || emulateWindows;
     if (windows) {
       await cache.emulateWindows();
@@ -1043,7 +1043,7 @@ Future<void> main() async {
   });
 
   test('evict all with partial edit does not store a value', () async {
-    final emulateWindows = false;
+    const emulateWindows = false;
     final windows = Platform.isWindows || emulateWindows;
     if (windows) {
       await cache.emulateWindows();
@@ -1061,7 +1061,7 @@ Future<void> main() async {
   });
 
   test('evict all doesnt interrupt partial read', () async {
-    final emulateWindows = false;
+    const emulateWindows = false;
     final windows = Platform.isWindows || emulateWindows;
     if (windows) {
       await cache.emulateWindows();
@@ -1085,7 +1085,7 @@ Future<void> main() async {
 
   test('edit snapshot after evict all returns null due to stale value',
       () async {
-    final emulateWindows = false;
+    const emulateWindows = false;
     final windows = Platform.isWindows || emulateWindows;
     if (windows) {
       await cache.emulateWindows();
@@ -1267,7 +1267,7 @@ Future<void> main() async {
 
     // Create an editor, then detach it.
     final editor = await cache.edit('k1').then((value) => value!);
-    await editor.newSink(0).buffer().use((closable) async {
+    await editor.newSink(0).buffered().use((closable) async {
       await cache.evictAll();
       // Complete the original edit. It goes into a black hole.
       closable.writeString('bb');
@@ -1280,7 +1280,7 @@ Future<void> main() async {
 
     // Create an editor, then detach it.
     final editor = await cache.edit('k1').then((value) => value!);
-    await editor.newSink(0).buffer().use((closable) async {
+    await editor.newSink(0).buffered().use((closable) async {
       await cache.evictAll();
 
       // Create another value in its place.
@@ -1312,7 +1312,7 @@ Future<void> main() async {
   });
 
   test('windows cannot read while writing', () async {
-    final emulateWindows = true;
+    const emulateWindows = true;
     final windows = Platform.isWindows || emulateWindows;
     if (windows) {
       await cache.emulateWindows();
@@ -1337,7 +1337,7 @@ Future<void> main() async {
 
   test('remove while reading creates zombie that is removed when read finishes',
       () async {
-    final emulateWindows = false;
+    const emulateWindows = false;
     final windows = Platform.isWindows || emulateWindows;
     if (windows) {
       await cache.emulateWindows();
@@ -1369,7 +1369,7 @@ Future<void> main() async {
   test(
       'remove while writing creates zombie that is removed when write finishes',
       () async {
-    final emulateWindows = false;
+    const emulateWindows = false;
     final windows = Platform.isWindows || emulateWindows;
     if (windows) {
       await cache.emulateWindows();
@@ -1393,7 +1393,7 @@ Future<void> main() async {
   });
 
   test('windows cannot read zombie entry', () async {
-    final emulateWindows = true;
+    const emulateWindows = true;
     final windows = Platform.isWindows || emulateWindows;
     if (windows) {
       await cache.emulateWindows();
@@ -1406,7 +1406,7 @@ Future<void> main() async {
   });
 
   test('windows cannot write zombie entry', () async {
-    final emulateWindows = true;
+    const emulateWindows = true;
     final windows = Platform.isWindows || emulateWindows;
     if (windows) {
       await cache.emulateWindows();
@@ -1419,7 +1419,7 @@ Future<void> main() async {
   });
 
   test('close with zombie read', () async {
-    final emulateWindows = false;
+    const emulateWindows = false;
     final windows = Platform.isWindows || emulateWindows;
     if (windows) {
       await cache.emulateWindows();
@@ -1444,7 +1444,7 @@ Future<void> main() async {
   });
 
   test('close with zombie write', () async {
-    final emulateWindows = false;
+    const emulateWindows = false;
     final windows = Platform.isWindows || emulateWindows;
     if (windows) {
       await cache.emulateWindows();
@@ -1470,7 +1470,7 @@ Future<void> main() async {
   });
 
   test('close with completed zombie write', () async {
-    final emulateWindows = false;
+    const emulateWindows = false;
     final windows = Platform.isWindows || emulateWindows;
     if (windows) {
       await cache.emulateWindows();
@@ -1511,7 +1511,7 @@ class FaultyFileSystem extends ForwardingFileSystem {
   @override
   Future<FileSystemEntityType> type(String path, {bool followLinks = true}) {
     if (faults.contains(path) || faults.contains(path)) {
-      throw StateError("boom!");
+      throw StateError('boom!');
     }
     return super.type(path, followLinks: followLinks);
   }
@@ -1519,7 +1519,7 @@ class FaultyFileSystem extends ForwardingFileSystem {
 
 extension EditorShortcuts on Editor {
   Future<void> setString(int index, String value) =>
-      newSink(index).buffer().use((sink) => sink.writeString(value));
+      newSink(index).buffered().use((sink) => sink.writeString(value));
 
   Future<void> assertInoperable() async {
     try {
@@ -1543,7 +1543,7 @@ extension EditorShortcuts on Editor {
 extension SnapshotShortcuts on Snapshot {
   Future<void> assertValue(int index, String value) async {
     expect(
-      await getSource(index).buffer().use((source) => source.readString()),
+      await getSource(index).buffered().use((source) => source.readString()),
       value,
     );
   }

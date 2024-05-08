@@ -1,18 +1,18 @@
 name: disk_cache_manager
 description: Disk cache manager for dart.
-version: 1.0.4
+version: 1.0.5
 homepage: https://github.com/sososdk/io/tree/master/disk_cache_manager
 
 environment:
-  sdk: '>=2.16.2 <4.0.0'
+  sdk: '>=3.3.0 <4.0.0'
 
 dependencies:
   crypto: '>=3.0.2 <4.0.0'
   pool: '>=1.5.0 <2.0.0'
-  disk_cache: ^1.0.6
-  file_system: ^1.0.2
-  anio: ^1.1.3
+  disk_cache: ^1.0.7
+  file_system: ^2.0.0
+  anio: ^2.0.0
 
 dev_dependencies:
   lints: ^3.0.0
-  test: ^1.25.2
+  test: ^1.25.5

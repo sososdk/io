@@ -1,3 +1,7 @@
+## 2.0.0
+
+- Break change.
+
 ## 1.1.2
 
 - When specifying the length, check whether the length is satisfied.

@@ -11,39 +11,6 @@ abstract interface class Source {
   FutureOr<void> close();
 }
 
-extension SourceBuffer on Source {
-  BufferedSource buffer() => _RealBufferedSource(this);
-
-  /// Attempts to exhaust this, returning true if successful. This is useful when reading a complete
-  /// source is helpful, such as when doing so completes a cache body or frees a socket connection for
-  /// reuse.
-  FutureOr<bool> discard([
-    Duration timeout = const Duration(milliseconds: 100),
-  ]) async {
-    try {
-      final skip = skipAll();
-      if (skip is Future) {
-        await skip.timeout(timeout);
-      }
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /// Reads until this is exhausted.
-  FutureOr<void> skipAll() async {
-    final skipBuffer = Buffer();
-    while (await read(skipBuffer, kBlockSize) != 0) {
-      skipBuffer.clear();
-    }
-  }
-}
-
-extension FutureSourceBuffer on Future<Source> {
-  Future<BufferedSource> buffer() async => _RealBufferedSource(await this);
-}
-
 abstract interface class BufferedSource implements Source {
   /// This source's internal buffer.
   Buffer get buffer;
@@ -70,12 +37,28 @@ abstract interface class BufferedSource implements Source {
   /// maximum number of bytes scanned is `start - end`.
   FutureOr<int> indexOf(int element, [int start = 0, int? end]);
 
+  /// Returns the index of the first match for [bytes] in the range of [start] inclusive to [end]
+  /// exclusive. This expands the buffer as necessary until [bytes] is found. This reads an unbounded number of
+  /// bytes into the buffer. Returns -1 if the stream is exhausted before the requested bytes are
+  /// found.
+  ///
+  /// ```dart
+  /// var MOVE = utf8.encode("move");
+  ///
+  /// Buffer buffer = new Buffer();
+  /// buffer.writeString("Don't move! He can't see us if we don't move.");
+  ///
+  /// expect(6,  buffer.indexOfBytes(MOVE));
+  /// expect(40, buffer.indexOfBytes(MOVE, 12));
+  /// ```
+  FutureOr<int> indexOfBytes(Uint8List bytes, [int start = 0, int? end]);
+
   /// Removes all bytes from this and appends them to `sink`. Returns the total number of bytes
   /// written to `sink` which will be 0 if this is exhausted.
   FutureOr<int> readIntoSink(Sink sink);
 
   /// Removes exactly `end - start` bytes from this and copies them into `sink`.
-  FutureOr<int> readIntoBytes(Uint8List sink, [int start = 0, int? end]);
+  FutureOr<int> readIntoBytes(List<int> sink, [int start = 0, int? end]);
 
   /// Removes bytes (all bytes if [count] is null) from this and returns them as a list of bytes.
   FutureOr<Uint8List> readBytes([int? count]);
@@ -161,22 +144,35 @@ abstract interface class BufferedSource implements Source {
   /// is thrown. Use this for machine-generated data where a missing line break implies truncated
   /// input.
   FutureOr<String> readLineStrict({Encoding encoding = utf8, int? end});
+
+  /// Returns true if `end` - `start` bytes at `offset` in this source equal [bytes] at [start].
+  /// This expands the buffer as necessary until a byte does not match, all bytes are matched, or if
+  /// the stream is exhausted before enough bytes could determine a match.
+  FutureOr<bool> rangeEquals(int offset, List<int> bytes,
+      [int start = 0, int? end]);
+
+  /// Returns a new `BufferedSource` that can read data from this `BufferedSource` without consuming
+  /// it. The returned source becomes invalid once this source is next read or closed.
+  ///
+  /// For example, we can use `peek()` to lookahead and read the same data multiple times.
+  ///
+  /// ```dart
+  /// final buffer = Buffer()
+  /// buffer.writeString("abcdefghi")
+  ///
+  /// buffer.readString(3) // returns "abc", buffer contains "defghi"
+  ///
+  /// final peek = buffer.peek()
+  /// peek.readString(3) // returns "def", buffer contains "defghi"
+  /// peek.readString(3) // returns "ghi", buffer contains "defghi"
+  ///
+  /// buffer.readString(3) // returns "def", buffer contains "ghi"
+  /// ```
+  FutureOr<BufferedSource> peek();
 }
 
-class ForwardingSource implements Source {
-  final Source delegate;
-
-  const ForwardingSource(this.delegate);
-
-  @override
-  FutureOr<int> read(Buffer sink, int count) => delegate.read(sink, count);
-
-  @override
-  FutureOr close() => delegate.close();
-}
-
-class _RealBufferedSource implements BufferedSource {
-  _RealBufferedSource(Source source)
+class RealBufferedSource implements BufferedSource {
+  RealBufferedSource(Source source)
       : _source = source,
         _buffer = Buffer();
 
@@ -189,63 +185,63 @@ class _RealBufferedSource implements BufferedSource {
   Buffer get buffer => _buffer;
 
   @override
-  FutureOr<int> read(Buffer sink, int count) async {
-    assert(count >= 0);
+  Future<int> read(Buffer sink, int count) async {
+    checkArgument(count >= 0, 'byteCount < 0: $count');
     checkState(!_closed, 'closed');
 
     if (_buffer.isEmpty) {
-      final result = await _source.read(buffer, kBlockSize);
+      final result = await _source.read(_buffer, kBlockSize);
       if (result == 0) return 0;
     }
 
-    return buffer.read(sink, min(count, buffer.length));
+    return _buffer.read(sink, min(count, _buffer._length));
   }
 
   @override
-  FutureOr<bool> exhausted() async {
+  Future<bool> exhausted() async {
     checkState(!_closed, 'closed');
     return _buffer.exhausted() && await _source.read(_buffer, kBlockSize) == 0;
   }
 
   @override
-  FutureOr<bool> request(int count) async {
-    assert(count >= 0);
+  Future<bool> request(int count) async {
+    checkArgument(count >= 0, 'byteCount < 0: $count');
     checkState(!_closed, 'closed');
-    while (_buffer.length < count) {
+    while (_buffer._length < count) {
       if (await _source.read(_buffer, kBlockSize) == 0) return false;
     }
     return true;
   }
 
   @override
-  FutureOr<void> require(int count) async {
-    if (!await request(count)) throw EOFException();
+  Future<void> require(int count) async {
+    if (!await request(count)) throw const EOFException();
   }
 
   @override
-  FutureOr<void> skip(int count) async {
+  Future<void> skip(int count) async {
     checkState(!_closed, 'closed');
     while (count > 0) {
       if (_buffer.isEmpty && await _source.read(_buffer, kBlockSize) == 0) {
-        throw EOFException();
+        throw const EOFException();
       }
-      final skip = min(count, _buffer.length);
+      final skip = min(count, _buffer._length);
       _buffer.skip(skip);
       count -= skip;
     }
   }
 
   @override
-  FutureOr<int> indexOf(int element, [int start = 0, int? end]) async {
+  Future<int> indexOf(int element, [int start = 0, int? end]) async {
+    checkArgument(start >= 0 && (end == null || start < end));
     checkState(!_closed, 'closed');
-    assert(end == null || start < end);
     while (end == null || start < end) {
       final result = _buffer.indexOf(element, start, end);
       if (result != -1) return result;
 
       // The byte wasn't in the buffer. Give up if we've already reached our target size or if the
       // underlying stream is exhausted.
-      final lastBufferLength = buffer.length;
+      final lastBufferLength = _buffer._length;
       if ((end != null && lastBufferLength >= end) ||
           await _source.read(_buffer, kBlockSize) == 0) {
         return -1;
@@ -258,9 +254,24 @@ class _RealBufferedSource implements BufferedSource {
   }
 
   @override
-  FutureOr<Uint8List> readBytes([int? count]) async {
+  Future<int> indexOfBytes(Uint8List bytes, [int start = 0, int? end]) async {
+    checkState(!_closed, 'closed');
+    while (true) {
+      final result = _buffer.indexOfBytes(bytes, start, end);
+      if (result != -1) return result;
+
+      final lastBufferSize = _buffer._length;
+      if (await _source.read(_buffer, kBlockSize) == 0) return -1;
+
+      // Keep searching, picking up from where we left off.
+      start = max(start, lastBufferSize - bytes.length + 1);
+    }
+  }
+
+  @override
+  Future<Uint8List> readBytes([int? count]) async {
     if (count == null) {
-      await _buffer.writeSource(_source);
+      await _buffer.writeFromSource(_source);
       return _buffer.readBytes();
     } else {
       await require(count);
@@ -269,67 +280,67 @@ class _RealBufferedSource implements BufferedSource {
   }
 
   @override
-  FutureOr<int> readInt8() async {
+  Future<int> readInt8() async {
     await require(1);
     return _buffer.readInt8();
   }
 
   @override
-  FutureOr<int> readUint8() async {
+  Future<int> readUint8() async {
     await require(1);
     return _buffer.readUint8();
   }
 
   @override
-  FutureOr<int> readInt16([Endian endian = Endian.big]) async {
+  Future<int> readInt16([Endian endian = Endian.big]) async {
     await require(2);
     return _buffer.readInt16(endian);
   }
 
   @override
-  FutureOr<int> readUint16([Endian endian = Endian.big]) async {
+  Future<int> readUint16([Endian endian = Endian.big]) async {
     await require(2);
     return _buffer.readUint16(endian);
   }
 
   @override
-  FutureOr<int> readInt32([Endian endian = Endian.big]) async {
+  Future<int> readInt32([Endian endian = Endian.big]) async {
     await require(4);
     return _buffer.readInt32(endian);
   }
 
   @override
-  FutureOr<int> readUint32([Endian endian = Endian.big]) async {
+  Future<int> readUint32([Endian endian = Endian.big]) async {
     await require(4);
     return _buffer.readUint32(endian);
   }
 
   @override
-  FutureOr<int> readInt64([Endian endian = Endian.big]) async {
+  Future<int> readInt64([Endian endian = Endian.big]) async {
     await require(8);
     return _buffer.readInt64(endian);
   }
 
   @override
-  FutureOr<int> readUint64([Endian endian = Endian.big]) async {
+  Future<int> readUint64([Endian endian = Endian.big]) async {
     await require(8);
     return _buffer.readUint64(endian);
   }
 
   @override
-  FutureOr<double> readFloat32([Endian endian = Endian.big]) async {
+  Future<double> readFloat32([Endian endian = Endian.big]) async {
     await require(4);
     return _buffer.readFloat32(endian);
   }
 
   @override
-  FutureOr<double> readFloat64([Endian endian = Endian.big]) async {
+  Future<double> readFloat64([Endian endian = Endian.big]) async {
     await require(8);
     return _buffer.readFloat64(endian);
   }
 
   @override
-  FutureOr<int> readIntoBytes(Uint8List sink, [int start = 0, int? end]) async {
+  Future<int> readIntoBytes(List<int> sink, [int start = 0, int? end]) async {
     end = RangeError.checkValidRange(start, end, sink.length);
     int totalBytes = 0;
     while (end > start) {
@@ -344,23 +355,26 @@ class _RealBufferedSource implements BufferedSource {
   }
 
   @override
-  FutureOr<int> readIntoSink(Sink sink) async {
-    int totalBytes = 0;
-    if (_buffer.isNotEmpty) {
-      totalBytes += _buffer.length;
-      await sink.write(_buffer, _buffer.length);
+  Future<int> readIntoSink(Sink sink) async {
+    var totalBytes = 0;
+    while (_source.read(_buffer, kBlockSize) != 0) {
+      final emitCount = buffer.completeSegmentByteCount();
+      if (emitCount > 0) {
+        totalBytes += emitCount;
+        sink.write(buffer, emitCount);
+      }
     }
-    while (await _source.read(_buffer, kBlockSize) != 0) {
-      totalBytes += _buffer.length;
-      await sink.write(_buffer, _buffer.length);
+    if (buffer.isNotEmpty) {
+      totalBytes += buffer._length;
+      sink.write(buffer, buffer._length);
     }
     return totalBytes;
   }
 
   @override
-  FutureOr<String> readString({Encoding encoding = utf8, int? count}) async {
+  Future<String> readString({Encoding encoding = utf8, int? count}) async {
     if (count == null) {
-      await _buffer.writeSource(_source);
+      await _buffer.writeFromSource(_source);
       return _buffer.readString(encoding: encoding);
     } else {
       await require(count);
@@ -369,10 +383,10 @@ class _RealBufferedSource implements BufferedSource {
   }
 
   @override
-  FutureOr<String?> readLine({Encoding encoding = utf8}) async {
+  Future<String?> readLine({Encoding encoding = utf8}) async {
     final newline = await indexOf(kLF);
     if (newline == -1) {
-      if (_buffer.length != 0) {
+      if (_buffer.isNotEmpty) {
         return _buffer.readString(encoding: encoding);
       } else {
         return null;
@@ -383,16 +397,40 @@ class _RealBufferedSource implements BufferedSource {
   }
 
   @override
-  FutureOr<String> readLineStrict({Encoding encoding = utf8, int? end}) async {
+  Future<String> readLineStrict({Encoding encoding = utf8, int? end}) async {
+    checkArgument(end == null || end > 0);
     final newline = await indexOf(kLF, 0, end);
     if (newline != -1) {
-      return _buffer.readLine(encoding: encoding, newline: newline)!;
+      return _buffer._readLine(encoding, newline);
     }
-    throw EOFException();
+    if (end != null &&
+        (await request(end) && _buffer[end - 1] == kCR) &&
+        (await request(end + 1) && _buffer[end] == kLF)) {
+      // The line was 'limit' UTF-8 bytes followed by \r\n.
+      return _buffer._readLine(encoding, end);
+    }
+    throw const EOFException();
   }
 
   @override
-  FutureOr<void> close() async {
+  FutureOr<BufferedSource> peek() => (PeekSource(this) as Source).buffered();
+
+  @override
+  Future<bool> rangeEquals(int offset, List<int> bytes,
+      [int start = 0, int? end]) async {
+    checkState(!_closed, 'closed');
+    checkArgument(offset >= 0);
+    end = RangeError.checkValidRange(start, end, bytes.length);
+    for (var i = start; i < end; i++) {
+      final bufferOffset = offset + i - start;
+      if (!await request(bufferOffset + 1)) return false;
+      if (buffer[bufferOffset] != bytes[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  Future<void> close() async {
     if (_closed) return;
     _closed = true;
     await _source.close();
@@ -403,17 +441,60 @@ class _RealBufferedSource implements BufferedSource {
   String toString() => 'buffer($_source)';
 }
 
-extension StreamSource on Stream<List<int>> {
-  Source source() => _StreamSource(this);
+extension SourceBuffer on Source {
+  RealBufferedSource buffered() => RealBufferedSource(this);
+
+  /// Attempts to exhaust this, returning true if successful. This is useful when reading a complete
+  /// source is helpful, such as when doing so completes a cache body or frees a socket connection for
+  /// reuse.
+  Future<bool> discard([
+    Duration timeout = const Duration(milliseconds: 100),
+  ]) async {
+    try {
+      await skipAll().timeout(timeout);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Reads until this is exhausted.
+  Future<void> skipAll() async {
+    final skipBuffer = Buffer();
+    while (await read(skipBuffer, kBlockSize) != 0) {
+      skipBuffer.clear();
+    }
+  }
 }
 
-class _StreamSource implements Source {
-  _StreamSource(this.stream) {
+extension FutureSourceBuffer on Future<Source> {
+  Future<RealBufferedSource> buffered() async => RealBufferedSource(await this);
+}
+
+class ForwardingSource implements Source {
+  final Source delegate;
+
+  const ForwardingSource(this.delegate);
+
+  @override
+  Future<int> read(Buffer sink, int count) async => delegate.read(sink, count);
+
+  @override
+  Future close() async => delegate.close();
+}
+
+extension InputSourceExtension on Stream<List<int>> {
+  Source source() => InputSource(this);
+}
+
+@internal
+class InputSource implements Source {
+  InputSource(this.stream) {
     _subscription = stream.listen(
       (event) {
         _subscription.pause();
         try {
-          _receiveBuffer.writeBytes(event);
+          _receiveBuffer.writeFromBytes(event);
           _completer?.complete();
         } catch (error, stackTrace) {
           _subscription
@@ -441,17 +522,17 @@ class _StreamSource implements Source {
 
   @override
   Future<int> read(Buffer sink, int count) async {
+    if (count == 0) return 0;
+    checkArgument(count >= 0, 'count < 0: $count');
     checkState(!_closed, 'closed');
     _subscription.resume();
     while (_receiveBuffer.isEmpty) {
-      if (_done) {
-        return 0;
-      }
+      if (_done) return 0;
       final completer = _completer = Completer();
       await completer.future;
       _completer = null;
     }
-    final length = min(count, _receiveBuffer.length);
+    final length = min(count, _receiveBuffer._length);
     sink.write(_receiveBuffer, length);
     return length;
   }
@@ -465,4 +546,50 @@ class _StreamSource implements Source {
       _completer?.completeError('StreamSource closed.');
     } catch (_) {}
   }
+}
+
+@internal
+class PeekSource implements Source {
+  PeekSource(this.upstream)
+      : buffer = upstream.buffer,
+        expectedSegment = upstream.buffer.head,
+        expectedPos = upstream.buffer.head?.pos;
+
+  final BufferedSource upstream;
+  final Buffer buffer;
+  Segment? expectedSegment;
+  int? expectedPos;
+
+  var _closed = false;
+  var _pos = 0;
+
+  @override
+  Future<int> read(Buffer sink, int count) async {
+    checkArgument(count >= 0, 'byteCount < 0: $count');
+    checkState(!_closed, 'closed');
+    // Source becomes invalid if there is an expected Segment and it and the expected position
+    // do not match the current head and head position of the upstream buffer
+    checkState(
+      expectedSegment == null ||
+          identical(expectedSegment, buffer.head) &&
+              expectedPos == buffer.head!.pos,
+      'Peek source is invalid because upstream source was used',
+    );
+    if (count == 0) return 0;
+    if (!await upstream.request(_pos + 1)) return -1;
+    if (expectedSegment == null && buffer.head != null) {
+      // Only once the buffer actually holds data should an expected Segment and position be
+      // recorded. This allows reads from the peek source to repeatedly return -1 and for data to be
+      // added later. Unit tests depend on this behavior.
+      expectedSegment = buffer.head;
+      expectedPos = buffer.head!.pos;
+    }
+    final toCopy = min(count, buffer._length - _pos);
+    buffer.copyTo(sink, _pos, toCopy);
+    _pos += toCopy;
+    return toCopy;
+  }
+
+  @override
+  void close() => _closed = true;
 }

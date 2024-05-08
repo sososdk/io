@@ -1,7 +1,7 @@
 part of 'zip_entry_source.dart';
 
 abstract class _DecompressSource implements Source {
-  _DecompressSource(Source source) : source = source.buffer();
+  _DecompressSource(Source source) : source = source.buffered();
 
   static _DecompressSource create(Source source, LocalFileHeader header) {
     return switch (header.compressionMethod) {
@@ -51,7 +51,7 @@ class _InflaterSource extends _DecompressSource {
       while (true) {
         final out = _inflater.processed(end: true);
         if (out == null) break;
-        _buffer.writeBytes(out);
+        _buffer.writeFromBytes(out);
       }
     } else {
       final bytes = source.buffer.readBytes();
@@ -59,7 +59,7 @@ class _InflaterSource extends _DecompressSource {
       while (true) {
         final out = _inflater.processed(flush: false);
         if (out == null) break;
-        _buffer.writeBytes(out);
+        _buffer.writeFromBytes(out);
       }
     }
   }

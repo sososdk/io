@@ -1,7 +1,7 @@
 part of 'zip_entry_source.dart';
 
 abstract class _CipherSource implements Source {
-  _CipherSource(Source entrySource) : entrySource = entrySource.buffer();
+  _CipherSource(Source entrySource) : entrySource = entrySource.buffered();
 
   static FutureOr<Source> create(BufferedSource source, Source entrySource,
       LocalFileHeader header, String? password,
@@ -81,13 +81,13 @@ class _AesCipherSource extends _CipherSource {
       _finished = true;
       final bytes = _decryptBuffer.readBytes();
       _decrypter.decryptData(bytes, 0, bytes.length);
-      _decryptedBuffer.writeBytes(bytes);
+      _decryptedBuffer.writeFromBytes(bytes);
     } else {
-      _decryptBuffer.writeBytes(entrySource.buffer.readBytes());
+      _decryptBuffer.writeFromBytes(entrySource.buffer.readBytes());
       final length = _decryptBuffer.length;
       final bytes = _decryptBuffer.readBytes(length - length % aesBlockSize);
       _decrypter.decryptData(bytes, 0, bytes.length);
-      _decryptedBuffer.writeBytes(bytes);
+      _decryptedBuffer.writeFromBytes(bytes);
     }
   }
 
@@ -124,7 +124,7 @@ class _StandardCipherSource extends _CipherSource {
     if (!await entrySource.exhausted()) {
       final bytes = entrySource.buffer.readBytes();
       _decrypter.decryptData(bytes, 0, bytes.length);
-      _buffer.writeBytes(bytes);
+      _buffer.writeFromBytes(bytes);
     }
   }
 }

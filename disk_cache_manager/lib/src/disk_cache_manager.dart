@@ -170,7 +170,7 @@ class CacheResponse {
   final Source body;
 
   static Future<CacheResponse> fromCache(Snapshot snapshot) async {
-    final metadataSource = snapshot.getSource(_kEntryMetadata).buffer();
+    final metadataSource = snapshot.getSource(_kEntryMetadata).buffered();
     final url = await metadataSource.readLineStrict();
     final method = await metadataSource.readLineStrict();
     final headers = (jsonDecode(await metadataSource.readLineStrict()) as Map)
@@ -187,7 +187,7 @@ class CacheResponse {
     final method = response.method;
     final headers = response.headers;
     final code = response.code;
-    final metadataSink = await editor.newSink(_kEntryMetadata).buffer();
+    final metadataSink = await editor.newSink(_kEntryMetadata).buffered();
     await metadataSink.writeLine(url);
     await metadataSink.writeLine(method);
     await metadataSink.writeLine(jsonEncode(headers));
@@ -271,7 +271,7 @@ class _CacheSourceBody extends ForwardingSource {
 
 class _CacheSinkBody implements Source {
   _CacheSinkBody(this.editor, this.bodySource, Sink bodySink)
-      : bodySink = bodySink.buffer();
+      : bodySink = bodySink.buffered();
 
   final Editor editor;
   final Source bodySource;
@@ -404,7 +404,7 @@ class _ReceivedSource extends ForwardingSource {
   int _received = 0;
 
   @override
-  FutureOr<int> read(Buffer sink, int count) async {
+  Future<int> read(Buffer sink, int count) async {
     final read = await super.read(sink, count);
     if (read != 0) listener?.call(_received += read);
     return read;

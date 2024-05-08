@@ -189,7 +189,7 @@ class DiskCache {
           }
         } catch (e) {
           _mostRecentRebuildFailed = true;
-          _journalWriter = BlackHoleSink().buffer();
+          _journalWriter = BlackHoleSink().buffered();
         }
       }, checkReentrant: false);
 
@@ -274,7 +274,7 @@ class DiskCache {
     final faultHidingSink = FaultHidingSink(fileSink, () {
       _hasJournalErrors = true;
     });
-    return faultHidingSink.buffer();
+    return faultHidingSink.buffered();
   }
 
   void _readJournalLine(String line) {
