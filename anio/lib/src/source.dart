@@ -357,16 +357,16 @@ class RealBufferedSource implements BufferedSource {
   @override
   Future<int> readIntoSink(Sink sink) async {
     var totalBytes = 0;
-    while (_source.read(_buffer, kBlockSize) != 0) {
+    while (await _source.read(_buffer, kBlockSize) != 0) {
       final emitCount = buffer.completeSegmentByteCount();
       if (emitCount > 0) {
         totalBytes += emitCount;
-        sink.write(buffer, emitCount);
+        await sink.write(buffer, emitCount);
       }
     }
     if (buffer.isNotEmpty) {
       totalBytes += buffer._length;
-      sink.write(buffer, buffer._length);
+      await sink.write(buffer, buffer._length);
     }
     return totalBytes;
   }
@@ -413,7 +413,7 @@ class RealBufferedSource implements BufferedSource {
   }
 
   @override
-  FutureOr<BufferedSource> peek() => (PeekSource(this) as Source).buffered();
+  FutureOr<BufferedSource> peek() => PeekSource(this).buffered();
 
   @override
   Future<bool> rangeEquals(int offset, List<int> bytes,

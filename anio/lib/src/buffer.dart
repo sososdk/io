@@ -278,7 +278,7 @@ class Buffer implements BufferedSource, BufferedSink {
   }
 
   @override
-  BufferedSource peek() => (PeekSource(this) as Source).buffered();
+  BufferedSource peek() => PeekSource(this).buffered();
 
   @override
   void write(Buffer source, int count) {

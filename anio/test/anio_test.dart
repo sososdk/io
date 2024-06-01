@@ -464,8 +464,8 @@ void main() {
           await sink.writeString('abcdefghijklmnop');
         });
         await e.source().buffered().use((source) async {
-          expect('abcde', await source.readString(count: 5));
-          expect('fghijklmnop', await source.readString());
+          expect(await source.readString(count: 5), 'abcde');
+          expect(await source.readString(), 'fghijklmnop');
         });
       });
     });
@@ -552,7 +552,8 @@ void main() {
       });
       await system.file('temp').openHandle(mode: FileMode.read).use((e) async {
         await e.source().buffered().use((source) async {
-          expect(data, await source.readBytes());
+          final uint8list = await source.readBytes();
+          expect(data, uint8list);
         });
       });
     });

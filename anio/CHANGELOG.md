@@ -1,3 +1,7 @@
+## 2.0.2
+
+- Fix bugs.
+
 ## 2.0.1
 
 - Add nullable extension.

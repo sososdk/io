@@ -38,6 +38,11 @@ class FileHandle {
   var _closed = false;
   var _openCount = 0;
 
+  @internal
+  Future<T> synchronized<T>(FutureOr<T> Function() computation) {
+    return _lock.synchronized(() => computation());
+  }
+
   Sink sink([int position = 0]) {
     checkState(!_closed, 'closed');
     _openCount++;
@@ -52,19 +57,22 @@ class FileHandle {
 
   Future<void> write(int position, Buffer source, int count) {
     checkState(!_closed, 'closed');
-    return writeNoCloseCheck(position, source, count);
+    return synchronized(() => writeNeedProtection(position, source, count));
   }
 
   @internal
-  Future<void> writeNoCloseCheck(int position, Buffer source, int count) async {
+  Future<void> writeNeedProtection(
+      int position, Buffer source, int count) async {
     RangeError.checkValueInInterval(count, 0, source._length);
+    await file.setPosition(position);
+
     var currentOffset = position;
     final targetOffset = position + count;
     while (currentOffset < targetOffset) {
       final head = source.head!;
       final toCopy = min(targetOffset - currentOffset, head.limit - head.pos);
       final end = head.pos + toCopy;
-      await protectedWrite(currentOffset, head.data, head.pos, end);
+      await file.writeFrom(head.data, head.pos, end);
       head.pos += toCopy;
       currentOffset += toCopy;
       source._length -= toCopy;
@@ -72,15 +80,6 @@ class FileHandle {
         source.head = head.pop();
       }
     }
-  }
-
-  @internal
-  Future<void> protectedWrite(
-      int position, List<int> bytes, int start, int end) {
-    return _lock.synchronized(() async {
-      await file.setPosition(position);
-      await file.writeFrom(bytes, start, end);
-    });
   }
 
   Source source([int position = 0]) {
@@ -91,20 +90,29 @@ class FileHandle {
 
   Future<int> read(int position, Buffer sink, int count) {
     checkState(!_closed, 'closed');
-    return readNoCloseCheck(position, sink, count);
+    return synchronized(() => readNeedProtection(position, sink, count));
   }
 
   @internal
-  Future<int> readNoCloseCheck(int position, Buffer sink, int count) async {
+  Future<int> readNeedProtection(int position, Buffer sink, int count) async {
     checkArgument(count >= 0, 'count < 0: $count');
+    await file.setPosition(position);
+
     var currentOffset = position;
     final targetOffset = position + count;
     while (currentOffset < targetOffset) {
       final tail = sink.writableSegment(1);
       final length = min(targetOffset - currentOffset, kBlockSize - tail.limit);
-      final readCount = await protectedRead(
-          currentOffset, tail.data, tail.limit, tail.limit + length);
-      if (readCount == 0) {
+      final bytes = tail.data;
+      final start = tail.limit;
+      final end = tail.limit + length;
+      var bytesRead = 0;
+      while (bytesRead < end - start) {
+        final readResult = await file.readInto(bytes, start + bytesRead, end);
+        if (readResult == 0) break;
+        bytesRead += readResult;
+      }
+      if (bytesRead == 0) {
         if (tail.pos == tail.limit) {
           // We allocated a tail segment, but didn't end up needing it. Recycle!
           sink.head = tail.pop();
@@ -113,25 +121,11 @@ class FileHandle {
         if (position == currentOffset) return 0;
         break;
       }
-      tail.limit += readCount;
-      currentOffset += readCount;
-      sink._length += readCount;
+      tail.limit += bytesRead;
+      currentOffset += bytesRead;
+      sink._length += bytesRead;
     }
     return currentOffset - position;
-  }
-
-  @internal
-  Future<int> protectedRead(int position, List<int> bytes, int start, int end) {
-    return _lock.synchronized(() async {
-      await file.setPosition(position);
-      var bytesRead = 0;
-      while (bytesRead < end - start) {
-        final readResult = await file.readInto(bytes, start + bytesRead, end);
-        if (readResult == 0) break;
-        bytesRead += readResult;
-      }
-      return bytesRead;
-    });
   }
 
   int positionSink(Sink sink) {
@@ -232,35 +226,35 @@ class FileHandle {
 
   Future<int> position() {
     checkState(!_closed, 'closed');
-    return _lock.synchronized(() => file.position());
+    return synchronized(() => file.position());
   }
 
   Future<void> truncate(int length) {
     checkState(!_closed, 'closed');
-    return _lock.synchronized(() => file.truncate(length));
+    return synchronized(() => file.truncate(length));
   }
 
   Future<int> length() {
     checkState(!_closed, 'closed');
-    return _lock.synchronized(() => file.length());
+    return synchronized(() => file.length());
   }
 
   Future<void> flush() {
     checkState(!_closed, 'closed');
-    return _lock.synchronized(() => file.flush());
+    return synchronized(() => file.flush());
   }
 
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
     if (_openCount != 0) return;
-    return _lock.synchronized(() => file.close());
+    return synchronized(() => file.close());
   }
 
   Future<void> _closeOpened() async {
     _openCount--;
     if (_openCount != 0 || !_closed) return;
-    return _lock.synchronized(() => file.close());
+    return synchronized(() => file.close());
   }
 }
 
@@ -277,8 +271,10 @@ class FileHandleSink implements Sink {
   @override
   Future<void> write(Buffer source, int count) async {
     checkState(!_closed, 'closed');
-    await fileHandle.writeNoCloseCheck(_position, source, count);
-    _position += count;
+    return fileHandle.synchronized(() async {
+      await fileHandle.writeNeedProtection(_position, source, count);
+      _position += count;
+    });
   }
 
   @override
@@ -308,9 +304,12 @@ class FileHandleSource implements Source {
   @override
   Future<int> read(Buffer sink, int count) async {
     checkState(!_closed, 'closed');
-    final result = await fileHandle.readNoCloseCheck(_position, sink, count);
-    if (result != 0) _position += result;
-    return result;
+    return fileHandle.synchronized(() async {
+      final result =
+          await fileHandle.readNeedProtection(_position, sink, count);
+      _position += result;
+      return result;
+    });
   }
 
   @override
