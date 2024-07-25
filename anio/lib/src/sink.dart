@@ -270,15 +270,15 @@ class RealBufferedSink implements BufferedSink {
 }
 
 extension SinkBuffer on Sink {
-  RealBufferedSink buffered() => RealBufferedSink(this);
+  BufferedSink buffered() => RealBufferedSink(this);
 }
 
 extension FutureSinkBuffer on Future<Sink> {
-  Future<RealBufferedSink> buffered() => then((e) => e.buffered());
+  Future<BufferedSink> buffered() => then((e) => e.buffered());
 }
 
 extension NullableFutureSinkBuffer on Future<Sink?> {
-  Future<RealBufferedSink?> buffered() => then((e) => e?.buffered());
+  Future<BufferedSink?> buffered() => then((e) => e?.buffered());
 }
 
 class ForwardingSink implements Sink {

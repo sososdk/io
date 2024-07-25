@@ -442,7 +442,7 @@ class RealBufferedSource implements BufferedSource {
 }
 
 extension SourceBuffer on Source {
-  RealBufferedSource buffered() => RealBufferedSource(this);
+  BufferedSource buffered() => RealBufferedSource(this);
 
   /// Attempts to exhaust this, returning true if successful. This is useful when reading a complete
   /// source is helpful, such as when doing so completes a cache body or frees a socket connection for
@@ -468,11 +468,11 @@ extension SourceBuffer on Source {
 }
 
 extension FutureSourceBuffer on Future<Source> {
-  Future<RealBufferedSource> buffered() => then((e) => e.buffered());
+  Future<BufferedSource> buffered() => then((e) => e.buffered());
 }
 
 extension NullableFutureSourceBuffer on Future<Source?> {
-  Future<RealBufferedSource?> buffered() => then((e) => e?.buffered());
+  Future<BufferedSource?> buffered() => then((e) => e?.buffered());
 }
 
 class ForwardingSource implements Source {
