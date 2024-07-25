@@ -18,7 +18,7 @@ void main() {
         final lock = Lock.reentrant();
 
         final list = <int>[];
-        var future1 = lock.synchronized(() async {
+        final future1 = lock.synchronized(() async {
           list.add(1);
           await lock.synchronized(() async {
             await sleep(10);
@@ -26,7 +26,7 @@ void main() {
           });
           list.add(3);
         });
-        var future2 = lock.synchronized(() {
+        final future2 = lock.synchronized(() {
           list.add(4);
         });
         await Future.wait([future1, future2]);
@@ -88,8 +88,8 @@ void main() {
       });
 
       test('two_locks', () async {
-        var lock1 = Lock.reentrant();
-        var lock2 = Lock.reentrant();
+        final lock1 = Lock.reentrant();
+        final lock2 = Lock.reentrant();
 
         expect(Zone.current[lock1], isNull);
 
@@ -109,7 +109,7 @@ void main() {
 
       test('late', () async {
         final lock = Lock.reentrant();
-        var completer = Completer<void>();
+        final completer = Completer<void>();
         await lock.synchronized(() {
           sleep(1).then((_) async {
             try {
@@ -161,8 +161,8 @@ void main() {
 void run(Lock Function() newLock) {
   group('base lock', () {
     test('two_locks', () async {
-      var lock1 = Lock();
-      var lock2 = Lock();
+      final lock1 = Lock();
+      final lock2 = Lock();
 
       bool? ok;
       await lock1.synchronized(() async {
@@ -208,10 +208,10 @@ void run(Lock Function() newLock) {
   });
 
   group('perf', () {
-    final operationCount = 10000;
+    const operationCount = 10000;
 
     test('$operationCount operations', () async {
-      var count = operationCount;
+      const count = operationCount;
       int j;
 
       final sw1 = Stopwatch();
@@ -234,7 +234,7 @@ void run(Lock Function() newLock) {
       sw2.stop();
       expect(j, count * (count - 1) / 2);
 
-      var lock = Lock();
+      final lock = Lock();
       final sw3 = Stopwatch();
       j = 0;
       sw3.start();
@@ -421,7 +421,7 @@ void run(Lock Function() newLock) {
 
   group('immediacity', () {
     test('sync', () async {
-      var lock = Lock();
+      final lock = Lock();
       int? value;
       final future = lock.synchronized(() {
         value = 1;
@@ -436,7 +436,7 @@ void run(Lock Function() newLock) {
     });
 
     test('async', () async {
-      var lock = Lock();
+      final lock = Lock();
       int? value;
       final future = lock.synchronized(() async {
         value = 1;

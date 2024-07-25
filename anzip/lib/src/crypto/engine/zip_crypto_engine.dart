@@ -9,8 +9,7 @@ class ZipCryptoEngine {
     _keys[0] = 305419896;
     _keys[1] = 591751049;
     _keys[2] = 878082192;
-    List<int> bytes =
-        useUtf8Password ? utf8.encode(password) : password.codeUnits;
+    final bytes = useUtf8Password ? utf8.encode(password) : password.codeUnits;
     for (int b in bytes) {
       updateKeys(b);
     }

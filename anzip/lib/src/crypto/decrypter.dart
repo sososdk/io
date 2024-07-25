@@ -38,7 +38,8 @@ class AESDecrypter with AesCipher implements Decrypter {
 
   int decryptData(Uint8List buff, int start, int len) {
     for (int j = start; j < (start + len); j += size) {
-      int loopCount = (j + size <= (start + len)) ? size : ((start + len) - j);
+      final loopCount =
+          (j + size <= (start + len)) ? size : ((start + len) - j);
       mac.update(buff, j, loopCount);
       prepareBuffAESIVBytes(iv, nonce);
       engine.processBlock(iv, 0, counterBlock, 0);

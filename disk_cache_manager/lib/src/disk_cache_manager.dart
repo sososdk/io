@@ -398,7 +398,7 @@ class _DefaultFetcher implements Fetcher {
 }
 
 class _ReceivedSource extends ForwardingSource {
-  _ReceivedSource(Source delegate) : super(delegate);
+  _ReceivedSource(super.delegate);
 
   void Function(int reveived)? listener;
   int _received = 0;

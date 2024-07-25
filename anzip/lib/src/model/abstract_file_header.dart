@@ -101,12 +101,12 @@ abstract class AbstractFileHeader implements ZipHeader {
   int get rawLastModifiedTime => _lastModifiedTime;
 
   DateTime get lastModifiedTime {
-    int sec = (_lastModifiedTime << 1) & 0x3e;
-    int min = (_lastModifiedTime >> 5) & 0x3f;
-    int hrs = (_lastModifiedTime >> 11) & 0x1f;
-    int day = (_lastModifiedTime >> 16) & 0x1f;
-    int mon = ((_lastModifiedTime >> 21) & 0xf) - 1;
-    int year = ((_lastModifiedTime >> 25) & 0x7f) + 1980;
+    final sec = (_lastModifiedTime << 1) & 0x3e;
+    final min = (_lastModifiedTime >> 5) & 0x3f;
+    final hrs = (_lastModifiedTime >> 11) & 0x1f;
+    final day = (_lastModifiedTime >> 16) & 0x1f;
+    final mon = ((_lastModifiedTime >> 21) & 0xf) - 1;
+    final year = ((_lastModifiedTime >> 25) & 0x7f) + 1980;
     final dosToEpochTime =
         DateTime.utc(year, mon, day, hrs, min, sec).millisecondsSinceEpoch;
     return DateTime.fromMillisecondsSinceEpoch(

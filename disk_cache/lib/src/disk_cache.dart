@@ -59,7 +59,7 @@ class DiskCache {
   static const _kMagic = 'so.io.DiskCache';
 
   /// 版本
-  static const _kVersion = "1";
+  static const _kVersion = '1';
 
   /// 记录的操作行为符
   static const _kRead = 'READ';
@@ -166,10 +166,10 @@ class DiskCache {
 
   /// Changes the maximum number of bytes the cache can store and queues a job
   /// to trim the existing store, if necessary.
-  Future<void> setMaxSize(int? maxSize) => _lock.synchronized(() {
+  Future<void> setMaxSize(int? maxSize) => _lock.synchronized(() async {
         _maxSize = maxSize;
         if (_initialized) {
-          _cleanup();
+          unawaited(_cleanup());
         }
       });
 
@@ -396,7 +396,7 @@ class DiskCache {
         _redundantOpCount++;
         await _journalWriter!.writeLine('$_kRead $key');
         if (_journalRebuildRequired()) {
-          _cleanup();
+          unawaited(_cleanup());
         }
 
         return snapshot;
@@ -430,7 +430,7 @@ class DiskCache {
           // the journal rebuild failed, the journal writer will not be active, meaning we will not be
           // able to record the edit, causing file leaks. In both cases, we want to retry the clean up
           // so we can get out of this state!
-          _cleanup();
+          unawaited(_cleanup());
           return null;
         }
 
@@ -513,7 +513,7 @@ class DiskCache {
     await _journalWriter!.flush();
 
     if ((_maxSize != null && _size > _maxSize!) || _journalRebuildRequired()) {
-      _cleanup();
+      unawaited(_cleanup());
     }
   }
 
@@ -571,7 +571,7 @@ class DiskCache {
     _lruEntries.remove(entry.key);
 
     if (_journalRebuildRequired()) {
-      _cleanup();
+      unawaited(_cleanup());
     }
     return true;
   }
@@ -936,7 +936,7 @@ class _Source extends ForwardingSource {
   final Future<void> Function() onClose;
   bool _closed = false;
 
-  _Source(Source delegate, this.onClose) : super(delegate);
+  _Source(super.delegate, this.onClose);
 
   @override
   Future close() async {

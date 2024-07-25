@@ -183,7 +183,7 @@ void main() {
     test('`get entries` returns all entries', () {
       lruMap = LruMap()..addAll({'A': 'Alpha', 'B': 'Beta', 'C': 'Charlie'});
 
-      var entries = lruMap.entries;
+      final entries = lruMap.entries;
       expect(entries, hasLength(3));
       // MapEntry objects are not equal to each other; cannot use `contains`. :(
       expect(entries.singleWhere((e) => e.key == 'A').value, equals('Alpha'));
@@ -194,7 +194,10 @@ void main() {
     test('addEntries adds items to the beginning', () {
       lruMap = LruMap()..addAll({'A': 'Alpha', 'B': 'Beta', 'C': 'Charlie'});
 
-      var entries = [const MapEntry('D', 'Delta'), const MapEntry('E', 'Echo')];
+      final entries = [
+        const MapEntry('D', 'Delta'),
+        const MapEntry('E', 'Echo')
+      ];
       lruMap.addEntries(entries);
       expect(lruMap.keys.toList(), ['A', 'B', 'C', 'D', 'E']);
     });
@@ -202,7 +205,10 @@ void main() {
     test('addEntries adds existing items to the beginning', () {
       lruMap = LruMap()..addAll({'A': 'Alpha', 'B': 'Beta', 'C': 'Charlie'});
 
-      var entries = [const MapEntry('B', 'Bravo'), const MapEntry('E', 'Echo')];
+      final entries = [
+        const MapEntry('B', 'Bravo'),
+        const MapEntry('E', 'Echo')
+      ];
       lruMap.addEntries(entries);
       expect(lruMap.keys.toList(), ['A', 'C', 'B', 'E']);
     });
@@ -278,7 +284,7 @@ void main() {
     });
 
     test('the linked list is mutated when promoting an item in the middle', () {
-      LruMap<String, int> lruMap = LruMap(maximumSize: 3)
+      final LruMap<String, int> lruMap = LruMap(maximumSize: 3)
         ..addAll({'C': 1, 'A': 1, 'B': 1});
       // Order is now [B, A, C]. Trigger promotion of A.
       lruMap['A'] = 1;

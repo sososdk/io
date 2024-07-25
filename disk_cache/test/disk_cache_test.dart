@@ -853,8 +853,8 @@ Future<void> main() async {
     expect(await fileSystem.exists(journalFile), isFalse);
     await createNewCache();
     final snapshot = await cache.get('k1').then((value) => value!);
-    snapshot.assertValue(0, 'ABC');
-    snapshot.assertValue(1, 'DE');
+    await snapshot.assertValue(0, 'ABC');
+    await snapshot.assertValue(1, 'DE');
     expect(await fileSystem.exists(journalBkpFile), isFalse);
     expect(await fileSystem.exists(journalFile), isTrue);
   });
@@ -966,8 +966,8 @@ Future<void> main() async {
     await set('a', 'a', 'a');
     final a = await cache.edit('a').then((value) => value!);
     await fileSystem.delete(cacheDir);
-    a.setString(1, 'a2');
-    a.commit();
+    await a.setString(1, 'a2');
+    await a.commit();
   }, onPlatform: {
     'windows': const Skip("Can't deleteContents while the journal is open.")
   });
@@ -1039,7 +1039,7 @@ Future<void> main() async {
     await cache.evictAll();
     expect(await cache.size, 0);
     await a.commit();
-    assertAbsent('a');
+    await assertAbsent('a');
   });
 
   test('evict all with partial edit does not store a value', () async {
@@ -1057,7 +1057,7 @@ Future<void> main() async {
     await cache.evictAll();
     expect(await cache.size, expectedByteCount);
     await a.commit();
-    assertAbsent('a');
+    await assertAbsent('a');
   });
 
   test('evict all doesnt interrupt partial read', () async {
@@ -1270,7 +1270,7 @@ Future<void> main() async {
     await editor.newSink(0).buffered().use((closable) async {
       await cache.evictAll();
       // Complete the original edit. It goes into a black hole.
-      closable.writeString('bb');
+      await closable.writeString('bb');
     });
     expect(await cache.get('k1'), isNull);
   });
@@ -1287,7 +1287,7 @@ Future<void> main() async {
       await set('k1', 'ccc', 'ccc');
 
       // Complete the original edit. It goes into a black hole.
-      closable.writeString('bb');
+      await closable.writeString('bb');
     });
     await assertValue('k1', 'ccc', 'ccc');
   });
@@ -1498,7 +1498,7 @@ Future<void> main() async {
 class FaultyFileSystem extends ForwardingFileSystem {
   final faults = <String>{};
 
-  FaultyFileSystem(FileSystem delegate) : super(delegate);
+  FaultyFileSystem(super.delegate);
 
   void setFaulty(String path, bool faulty) {
     if (faulty) {
