@@ -248,45 +248,53 @@ extension FileSystemShortcuts on FileSystem {
   ///
   /// If you need to move files across volumes, use [copy] followed by [delete], and change your
   /// application logic to recover should the copy step suffer a partial failure.
-  Future<void> atomicMove(String source, String target) =>
-      entity(source).then((e) async {
-        if (e == null) {
-          throw FileSystemException('No such file or directory', source);
-        }
-        await directory(p.dirname(target)).create(recursive: true);
-        await e.rename(target);
-      });
+  Future<void> atomicMove(String source, String target) {
+    return entity(source).then((e) async {
+      if (e == null) {
+        throw FileSystemException('No such file or directory', source);
+      }
+      await directory(p.dirname(target)).create(recursive: true);
+      await e.rename(target);
+    });
+  }
 
-  Future<FileSystemEntity> copy(String source, String target) =>
-      entity(source).then((e) async {
-        if (e is File) {
-          return e.copy(target);
-        } else if (e is Directory) {
-          if (p.canonicalize(source) == p.canonicalize(target)) {
-            return e;
-          }
-          if (p.isWithin(source, target)) {
-            throw ArgumentError('Cannot copy $source to $target');
-          }
-          final dir = directory(target);
-          await dir.create(recursive: true);
-          await for (final sub in e.list(recursive: true, followLinks: false)) {
-            final copyTo = p.join(target, p.relative(sub.path, from: source));
-            if (sub is Directory) {
-              await directory(copyTo).create(recursive: true);
-            } else if (sub is File) {
-              await file(sub.path).copy(copyTo);
-            } else if (sub is Link) {
-              await link(copyTo).create(await sub.target(), recursive: true);
-            }
-          }
-          return dir;
-        } else if (e is Link) {
-          return link(target).create(await e.target(), recursive: true);
-        } else {
-          throw FileSystemException('No such file or directory', source);
+  Future<FileSystemEntity> copy(
+    String source,
+    String target, {
+    bool followLinks = true,
+  }) {
+    return entity(source).then((e) async {
+      if (e is File) {
+        await directory(p.dirname(target)).create(recursive: true);
+        return e.copy(target);
+      } else if (e is Directory) {
+        if (p.canonicalize(source) == p.canonicalize(target)) {
+          return e;
         }
-      });
+        if (p.isWithin(source, target)) {
+          throw ArgumentError('Cannot copy $source to $target');
+        }
+        final dir = directory(target);
+        await dir.create(recursive: true);
+        final stream = e.list(recursive: true, followLinks: followLinks);
+        await for (final sub in stream) {
+          final copyTo = p.join(target, p.relative(sub.path, from: source));
+          if (sub is Directory) {
+            await directory(copyTo).create(recursive: true);
+          } else if (sub is File) {
+            await file(sub.path).copy(copyTo);
+          } else if (sub is Link) {
+            await link(copyTo).create(await sub.target(), recursive: true);
+          }
+        }
+        return dir;
+      } else if (e is Link) {
+        return link(target).create(await e.target(), recursive: true);
+      } else {
+        throw FileSystemException('No such file or directory', source);
+      }
+    });
+  }
 
   /// Returns true if file streams can be manipulated independently of their
   /// paths. This is typically true for systems like Mac, Unix, and Linux that

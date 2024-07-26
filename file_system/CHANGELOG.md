@@ -1,3 +1,7 @@
+## 2.0.3
+
+- `copy` automatically creates the target folder.
+
 ## 2.0.2
 
 - update dependencies.
