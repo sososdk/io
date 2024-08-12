@@ -26,7 +26,7 @@ Currently only the decompression function is supported.
 
 ```dart
 // Open a zip file and paras header.
-final zipFile = await ZipFile.open(File('path'));
+final zipFile = await ZipFile.file(File('path'));
 
 // Gat all file headers.
 final headers = zipFile.fileHeaders;
@@ -39,20 +39,23 @@ final entrySource = await zipFile.getEntrySource(headers.first);
 
 // Close resource
 await entrySource?.close();
-await zipFile.close();
 ```
 
 Or use `use` and `file_system`:
 ```dart
 final fileSystem = LocalFileSystem();
-await ZipFile.open(fileSystem.file(file)).use((zip) async {
-  for (final header in zip.fileHeaders) {
-    await zip.getEntrySource(header).use((entrySource) async {
-      if (entrySource == null) return;
-      await fileSystem
-          .openSink(join(output, header.fileName), recursive: true)
-          .use((sink) => sink.buffer().writeSource(entrySource));
-    });
-  }
+final zipFile = await ZipFile.file(fileSystem.file(path));
+await zipFile.openRead().use((handle) async {
+    for (final header in zipFile.fileHeaders) {
+        await zipFile.getZipEntrySource(handle, header).use((source) =>
+            fileSystem
+                .openSink(join(output, header.fileName), recursive: true)
+                .buffered()
+                .use((sink) => sink.writeFromSource(source)));
+    }
 });
 ```
+
+## References
+
+- https://en.wikipedia.org/wiki/ZIP_(file_format)

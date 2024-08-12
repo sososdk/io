@@ -3,9 +3,8 @@ part of 'zip_entry_source.dart';
 abstract class _CipherSource implements Source {
   _CipherSource(Source entrySource) : entrySource = entrySource.buffered();
 
-  static FutureOr<Source> create(BufferedSource source, Source entrySource,
-      LocalFileHeader header, String? password,
-      [bool useUtf8Password = true]) async {
+  static Future<Source> create(BufferedSource source, Source entrySource,
+      LocalFileHeader header, Uint8List? password) async {
     if (header.encryptionMethod == EncryptionMethod.none) {
       return _NoCipherSource(entrySource);
     } else if (header.encryptionMethod == EncryptionMethod.aes) {
@@ -19,16 +18,16 @@ abstract class _CipherSource implements Source {
       final strength = aesData.aesKeyStrength;
       final salt = await source.readBytes(strength.saltLength);
       final passwordVerifier = await source.readBytes(aesVerifierLength);
-      final decrypter = AESDecrypter(
-          strength, salt, passwordVerifier, password, useUtf8Password);
+      final decrypter =
+          AESDecrypter(strength, salt, passwordVerifier, password);
       return _AesCipherSource(source, entrySource, decrypter);
     } else if (header.encryptionMethod == EncryptionMethod.standard) {
       if (password == null || password.isEmpty) {
         throw ZipException('no password provided for standard decryption');
       }
       final headerBytes = await source.readBytes(stdDecHdrSize);
-      final decrypter = StandardDecrypter(headerBytes,
-          header.rawLastModifiedTime, header.crc, password, useUtf8Password);
+      final decrypter = StandardDecrypter(
+          headerBytes, header.rawLastModifiedTime, header.crc, password);
       return _StandardCipherSource(entrySource, decrypter);
     } else {
       throw ZipException(

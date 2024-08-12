@@ -13,9 +13,8 @@ abstract interface class Decrypter {}
 
 class AESDecrypter with AesCipher implements Decrypter {
   AESDecrypter(this.strength, Uint8List salt, Uint8List passwordVerifier,
-      String password,
-      [bool useUtf8Password = true]) {
-    final derivedKey = derivePasswordBasedKey(salt, password, useUtf8Password);
+      Uint8List password) {
+    final derivedKey = derivePasswordBasedKey(salt, password);
     final derivedPasswordVerifier = derivePasswordVerifier(derivedKey);
     if (!const ListEquality()
         .equals(passwordVerifier, derivedPasswordVerifier)) {
@@ -59,9 +58,9 @@ class AESDecrypter with AesCipher implements Decrypter {
 }
 
 class StandardDecrypter implements Decrypter {
-  StandardDecrypter(Uint8List headerBytes, int time, int crc, String password,
-      [bool useUtf8Password = true]) {
-    _engine.initKeys(password, useUtf8Password);
+  StandardDecrypter(
+      Uint8List headerBytes, int time, int crc, Uint8List password) {
+    _engine.initKeys(password);
 
     var result = headerBytes[0];
     for (var i = 0; i < stdDecHdrSize; i++) {

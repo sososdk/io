@@ -18,13 +18,7 @@ class ZipModel {
 
   bool get isZip64Format => zip64EndOfCentralDirectoryLocator != null;
 
-  bool get splitArchive {
-    if (isZip64Format) {
-      return (zip64EndOfCentralDirectoryRecord!.numberOfThisDisk) > 0;
-    } else {
-      return endOfCentralDirectoryRecord.numberOfThisDisk > 0;
-    }
-  }
+  bool get splitArchive => numberOfThisDisk > 0;
 
   int get numberOfThisDisk {
     if (isZip64Format) {

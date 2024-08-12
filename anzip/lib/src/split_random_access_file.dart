@@ -32,10 +32,10 @@ class SplitRandomAccessFile implements RandomAccessFile {
 
   static Future<RandomAccessFile> openWrite(
     // a.zip
-    File file, {
+    File file,
+    SplitFileNaming naming, {
     int splitLength = 1024 * 1024 * 1024,
   }) async {
-    final naming = SplitFileNaming(p.basenameWithoutExtension(file.path));
     final randomAccessFile = await file.open(mode: FileMode.writeOnly);
     return SplitRandomAccessFile(
         file, FileMode.writeOnly, 0, splitLength, randomAccessFile, naming, 0);

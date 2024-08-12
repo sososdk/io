@@ -15,6 +15,6 @@ dependencies:
 
 dev_dependencies:
   lints: ^4.0.0
-  test: ^1.25.5
+  test: ^1.25.8
 
-  file_system: ^2.0.1
+  file_system: ^2.0.3

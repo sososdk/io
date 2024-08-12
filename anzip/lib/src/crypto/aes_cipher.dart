@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:pointycastle/export.dart';
@@ -9,8 +8,7 @@ import '../zip_constants.dart';
 mixin AesCipher {
   AesKeyStrength get strength;
 
-  Uint8List derivePasswordBasedKey(
-      Uint8List salt, String password, bool useUtf8Password) {
+  Uint8List derivePasswordBasedKey(Uint8List salt, Uint8List password) {
     if (password.isEmpty) {
       throw ArgumentError('password cannot be empty');
     }
@@ -18,12 +16,9 @@ mixin AesCipher {
     final int macLength = strength.macLength;
     final int derivedKeyLength = keyLength + macLength + aesVerifierLength;
 
-    final passwordBytes = useUtf8Password
-        ? utf8.encode(password)
-        : Uint8List.fromList(password.codeUnits);
     final params = Pbkdf2Parameters(salt, 1000, derivedKeyLength);
     final derivator = PBKDF2KeyDerivator(HMac(SHA1Digest(), 64))..init(params);
-    return derivator.process(passwordBytes);
+    return derivator.process(password);
   }
 
   Uint8List derivePasswordVerifier(Uint8List derivedKey) {

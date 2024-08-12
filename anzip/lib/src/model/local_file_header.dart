@@ -1,5 +1,4 @@
 import '../zip_constants.dart';
-import '../zip_exception.dart';
 import 'abstract_file_header.dart';
 
 /// Used to read zip Entry directly in sequence without reading zip Central Directory.
@@ -18,18 +17,13 @@ class LocalFileHeader extends AbstractFileHeader {
     super.extraDataRecords,
     super.zip64ExtendedInfo,
     super.aesExtraDataRecord, [
-    this._isDirectory,
     this.extraField,
-    this.offsetStartOfData,
-    this.writeCompressedSizeInZip64ExtraRecord,
-    this.extendedDataUpdated = false,
   ]);
 
   LocalFileHeader copyWith({
     int? crc,
     int? compressedSize,
     int? uncompressedSize,
-    bool? isDirectory,
   }) {
     return LocalFileHeader(
       versionNeededToExtract,
@@ -45,33 +39,18 @@ class LocalFileHeader extends AbstractFileHeader {
       extraDataRecords,
       zip64ExtendedInfo,
       aesExtraDataRecord,
-      isDirectory ?? _isDirectory,
       extraField,
-      offsetStartOfData,
-      writeCompressedSizeInZip64ExtraRecord,
-      true,
     );
   }
 
   @override
   int get signature => locsig;
 
-  final bool? _isDirectory;
   final List<int>? extraField;
-  final int? offsetStartOfData;
-  final bool? writeCompressedSizeInZip64ExtraRecord;
-  final bool extendedDataUpdated;
 
   @override
-  bool get isDirectory {
-    return _isDirectory ?? fileName.endsWith('/') || fileName.endsWith('\\');
-  }
+  bool get isDirectory => false;
 
-  @override
-  int get compressedSize {
-    if (dataDescriptorExists && !extendedDataUpdated) {
-      throw ZipException('compressed size not updated');
-    }
-    return super.compressedSize;
-  }
+  bool get isZip64Format =>
+      compressedSize >= zip64sizelimit || uncompressedSize >= zip64sizelimit;
 }

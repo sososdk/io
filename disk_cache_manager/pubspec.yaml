@@ -9,10 +9,10 @@ environment:
 dependencies:
   crypto: '>=3.0.2 <4.0.0'
   pool: '>=1.5.0 <2.0.0'
-  disk_cache: ^1.0.8
-  file_system: ^2.0.1
+  disk_cache: ^1.0.9
+  file_system: ^2.0.3
   anio: ^2.0.3
 
 dev_dependencies:
   lints: ^4.0.0
-  test: ^1.25.5
+  test: ^1.25.8

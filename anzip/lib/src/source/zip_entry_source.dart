@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -12,23 +13,40 @@ import '../crypto/decrypter.dart';
 import '../encryption_method.dart';
 import '../model/aes_version.dart';
 import '../model/data_descriptor.dart';
+import '../model/file_header.dart';
 import '../model/local_file_header.dart';
 import '../zip_constants.dart';
 import '../zip_exception.dart';
+import '../zip_header_reader.dart';
 
 part 'cipher_source.dart';
 part 'decompress_source.dart';
 
-FutureOr<Source> createZipEntrySource(
-  BufferedSource source,
-  LocalFileHeader header,
-  String? password,
+Future<Source> createZipEntrySource(
+  Source source,
+  FileHeader fileHeader,
+  Encoding encoding,
+  Uint8List? password,
 ) async {
-  final entrySource = _ZipEntrySource(source, header);
+  final buffer = source.buffered();
+  var header = await LocalFileHeaderReader(buffer, encoding).parse();
+  if (header == null) {
+    throw ZipException(
+        'Could not read corresponding local file header for file header: ${fileHeader.fileName}');
+  }
+  if (fileHeader.fileName != header.fileName) {
+    throw ZipException('File header and local file header mismatch');
+  }
+  header = header.copyWith(
+    crc: fileHeader.crc,
+    compressedSize: fileHeader.compressedSize,
+    uncompressedSize: fileHeader.uncompressedSize,
+  );
+  final entrySource = _ZipEntrySource(buffer, header);
   final cipherSource =
-      await _CipherSource.create(source, entrySource, header, password);
+      await _CipherSource.create(buffer, entrySource, header, password);
   final decompressSource = _DecompressSource.create(cipherSource, header);
-  return _CrcCheckSource(source, header, decompressSource);
+  return _CrcCheckSource(buffer, header, decompressSource);
 }
 
 class _CrcCheckSource extends ForwardingSource {
@@ -59,7 +77,7 @@ class _CrcCheckSource extends ForwardingSource {
     if (_verified) return;
     _verified = true;
     DataDescriptor? descriptor;
-    if (header.dataDescriptorExists && !header.extendedDataUpdated) {
+    if (header.dataDescriptorExists) {
       final sigOrCrc = await source.readUint32(Endian.little);
       final int crc, compressedSize, uncompressedSize;
       //According to zip specification, presence of extra data record header signature is optional.

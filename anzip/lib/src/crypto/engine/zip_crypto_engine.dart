@@ -1,16 +1,15 @@
-import 'dart:convert';
+import 'dart:typed_data';
 
 import '../crc32.dart';
 
 class ZipCryptoEngine {
   final _keys = List.filled(3, 0);
 
-  void initKeys(String password, bool useUtf8Password) {
+  void initKeys(Uint8List password) {
     _keys[0] = 305419896;
     _keys[1] = 591751049;
     _keys[2] = 878082192;
-    final bytes = useUtf8Password ? utf8.encode(password) : password.codeUnits;
-    for (int b in bytes) {
+    for (int b in password) {
       updateKeys(b);
     }
   }
