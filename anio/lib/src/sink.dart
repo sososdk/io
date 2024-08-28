@@ -367,9 +367,9 @@ class OutputSink implements Sink {
   final core.Sink<List<int>> sink;
 
   @override
-  Future<void> write(Buffer source, int byteCount) async {
-    RangeError.checkValueInInterval(byteCount, 0, source._length);
-    var remaining = byteCount;
+  Future<void> write(Buffer source, int count) async {
+    RangeError.checkValueInInterval(count, 0, source._length);
+    var remaining = count;
     while (remaining > 0) {
       final head = source.head!;
       final toCopy = min(remaining, head.limit - head.pos);
