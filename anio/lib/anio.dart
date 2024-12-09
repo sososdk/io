@@ -1,4 +1,4 @@
-library anio;
+library;
 
 export 'src/anio.dart'
     show
@@ -20,7 +20,11 @@ export 'src/anio.dart'
         FutureSourceBuffer,
         NullableFutureSourceBuffer,
         InputSourceExtension,
+        LimitedLengthSourceExtension,
         Buffer,
+        Segment,
+        RandomAccessFileExtension,
+        FutureRandomAccessFileExtension,
         FileHandle,
         FileHandleFileExtension,
         FileHandleRandomAccessFileExtension,

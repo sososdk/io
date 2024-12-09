@@ -98,6 +98,9 @@ class RealBufferedSink implements BufferedSink {
 
   bool _closed = false;
 
+  @internal
+  Sink get sink => _sink;
+
   @override
   Buffer get buffer => _buffer;
 
@@ -197,7 +200,7 @@ class RealBufferedSink implements BufferedSink {
     checkState(!_closed, 'closed');
     var totalBytes = 0;
     while (true) {
-      final result = await source.read(_buffer, kBlockSize);
+      final result = await source.read(_buffer, Segment.size);
       if (result == 0) break;
       totalBytes += result;
       await emitCompleteSegments();
@@ -233,7 +236,7 @@ class RealBufferedSink implements BufferedSink {
   Future<void> emit() async {
     checkState(!_closed, 'closed');
     if (_buffer.isNotEmpty) {
-      await _sink.write(_buffer, _buffer._length);
+      await _sink.write(_buffer, _buffer.length);
     }
   }
 
@@ -241,7 +244,7 @@ class RealBufferedSink implements BufferedSink {
   Future<void> flush() async {
     checkState(!_closed, 'closed');
     if (_buffer.isNotEmpty) {
-      await _sink.write(_buffer, _buffer._length);
+      await _sink.write(_buffer, _buffer.length);
     }
     await _sink.flush();
   }
@@ -254,7 +257,7 @@ class RealBufferedSink implements BufferedSink {
     Object? thrown;
     try {
       if (_buffer.isNotEmpty) {
-        await _sink.write(_buffer, _buffer._length);
+        await _sink.write(_buffer, _buffer.length);
       }
     } catch (e) {
       thrown = e;
@@ -281,10 +284,8 @@ extension NullableFutureSinkBuffer on Future<Sink?> {
   Future<BufferedSink?> buffered() => then((e) => e?.buffered());
 }
 
-class ForwardingSink implements Sink {
-  final Sink delegate;
-
-  const ForwardingSink(this.delegate);
+mixin ForwardingSink implements Sink {
+  Sink get delegate;
 
   @override
   Future<void> write(Buffer source, int count) async =>
@@ -310,11 +311,14 @@ class BlackHoleSink implements Sink {
   void close() => Future.value();
 }
 
-class FaultHidingSink extends ForwardingSink {
+class FaultHidingSink with ForwardingSink {
   final void Function() onError;
   var _hasErrors = false;
 
-  FaultHidingSink(super.sink, this.onError);
+  FaultHidingSink(this.delegate, this.onError);
+
+  @override
+  final Sink delegate;
 
   @override
   Future<void> write(Buffer source, int count) async {
@@ -368,7 +372,7 @@ class OutputSink implements Sink {
 
   @override
   Future<void> write(Buffer source, int count) async {
-    RangeError.checkValueInInterval(count, 0, source._length);
+    RangeError.checkValueInInterval(count, 0, source.length);
     var remaining = count;
     while (remaining > 0) {
       final head = source.head!;
@@ -377,7 +381,7 @@ class OutputSink implements Sink {
 
       head.pos += toCopy;
       remaining -= toCopy;
-      source._length -= toCopy;
+      source.length -= toCopy;
 
       if (head.pos == head.limit) {
         source.head = head.pop();

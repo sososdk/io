@@ -1,7 +1,6 @@
 class ExtraDataRecord {
-  const ExtraDataRecord(this.header, this.size, this.data);
+  const ExtraDataRecord(this.signature, this.data);
 
-  final int header;
-  final int size;
+  final int signature;
   final List<int> data;
 }

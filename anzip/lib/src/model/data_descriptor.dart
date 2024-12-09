@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+
+import 'package:anio/anio.dart';
+
 import '../zip_constants.dart';
 import 'zip_header.dart';
 
@@ -9,9 +13,21 @@ class DataDescriptor implements ZipHeader {
   );
 
   @override
-  int get signature => extsig;
+  int get signature => kExtsig;
 
   final int crc;
   final int compressedSize;
   final int uncompressedSize;
+
+  Future<void> write(BufferedSink sink, bool isZip64Format) async {
+    await sink.writeInt32(signature, Endian.little);
+    await sink.writeInt32(crc, Endian.little);
+    if (isZip64Format) {
+      await sink.writeInt64(compressedSize, Endian.little);
+      await sink.writeInt64(uncompressedSize, Endian.little);
+    } else {
+      await sink.writeInt32(compressedSize, Endian.little);
+      await sink.writeInt32(uncompressedSize, Endian.little);
+    }
+  }
 }

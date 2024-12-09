@@ -1,3 +1,7 @@
+## 2.0.4
+
+- Fix bugs.
+
 ## 2.0.3
 
 - Hide `RealBufferedSource` and `RealBufferedSink`.

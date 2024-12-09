@@ -1,13 +1,13 @@
+import 'dart:typed_data';
+
 import '../zip_constants.dart';
 import 'zip_header.dart';
 
 class DigitalSignature implements ZipHeader {
-  const DigitalSignature(this.size, this.signatureData);
+  const DigitalSignature(this.signatureData);
 
   @override
-  int get signature => digsig;
+  int get signature => kDigsig;
 
-  final int? size;
-
-  final String? signatureData;
+  final Uint8List signatureData;
 }

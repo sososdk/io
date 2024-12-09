@@ -1,3 +1,7 @@
+## 2.0.0
+
+- improve functions.
+
 ## 1.0.6
 
 - Update dependencies.

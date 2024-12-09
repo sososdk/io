@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:pointycastle/export.dart';
 
-import '../model/aes_key_strength.dart';
+import '../model/encryption_method.dart';
 import '../zip_constants.dart';
 
 mixin AesCipher {
@@ -14,7 +14,7 @@ mixin AesCipher {
     }
     final int keyLength = strength.keyLength;
     final int macLength = strength.macLength;
-    final int derivedKeyLength = keyLength + macLength + aesVerifierLength;
+    final int derivedKeyLength = keyLength + macLength + kAesVerifierLength;
 
     final params = Pbkdf2Parameters(salt, 1000, derivedKeyLength);
     final derivator = PBKDF2KeyDerivator(HMac(SHA1Digest(), 64))..init(params);
@@ -38,7 +38,7 @@ mixin AesCipher {
     return HMac(SHA1Digest(), 64)..init(KeyParameter(macKey));
   }
 
-  void prepareBuffAESIVBytes(Uint8List buff, int nonce) {
+  void prepareBuffAesIVBytes(Uint8List buff, int nonce) {
     buff[0] = nonce & 0xFF;
     buff[1] = (nonce >> 8) & 0xFF;
     buff[2] = (nonce >> 16) & 0xFF;

@@ -1,4 +1,4 @@
-library file_system;
+library;
 
 import 'dart:async';
 

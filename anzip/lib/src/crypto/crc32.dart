@@ -16,10 +16,10 @@ class Crc32 {
 
 /// Get the CRC-32 checksum of the given int.
 int crc32(int crc, int b) {
-  return ((crc >>> 8) ^ crcTable[(crc ^ b) & 0xff]);
+  return ((crc >>> 8) ^ _crcTable[(crc ^ b) & 0xff]);
 }
 
-const crcTable = [
+const _crcTable = [
   0x00000000,
   0x77073096,
   0xEE0E612C,

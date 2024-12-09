@@ -10,19 +10,12 @@ import 'package:meta/meta.dart';
 import 'package:synchronizer/synchronizer.dart';
 
 part 'buffer.dart';
-part 'file_handle.dart';
+part 'io.dart';
 part 'sink.dart';
 part 'source.dart';
 
 const int kLF = 10; // \n
 const int kCR = 13; // \r
-/// The size of all segments in bytes.
-@visibleForTesting
-const int kBlockSize = 8192;
-
-/// Segments will be shared when doing so avoids `arraycopy()` of this many bytes.
-@visibleForTesting
-const int kShareMinimum = 1024;
 
 class EOFException implements IOException {
   const EOFException();
@@ -50,12 +43,12 @@ extension ClosableExtension<T extends dynamic> on T {
         return result;
       }
     } finally {
-      final result = safeClose(close);
+      final result = _close(close);
       if (result is Future) await result;
     }
   }
 
-  FutureOr<void> safeClose([FutureOr<void> Function()? close]) async {
+  FutureOr<void> _close([FutureOr<void> Function()? close]) async {
     try {
       final function = close ?? this?.close;
       if (function == null) return;

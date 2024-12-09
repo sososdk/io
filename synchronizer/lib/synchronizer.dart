@@ -1,4 +1,4 @@
-library synchronizer;
+library;
 
 import 'dart:async';
 

@@ -1,5 +1,3 @@
-library quiver.collection.lru_map_test;
-
 import 'package:disk_cache/src/lru_map.dart';
 import 'package:test/test.dart';
 

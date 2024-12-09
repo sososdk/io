@@ -932,18 +932,20 @@ class Entry {
   }
 }
 
-class _Source extends ForwardingSource {
+class _Source with ForwardingSource {
   final Future<void> Function() onClose;
   bool _closed = false;
 
-  _Source(super.delegate, this.onClose);
+  _Source(this.delegate, this.onClose);
+
+  @override
+  final Source delegate;
 
   @override
   Future close() async {
-    if (!_closed) {
-      _closed = true;
-      await delegate.close();
-      await onClose();
-    }
+    if (_closed) return;
+    _closed = true;
+    await delegate.close();
+    await onClose();
   }
 }

@@ -1,16 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:anio/anio.dart';
+import 'package:file_system/file_system.dart';
 
 import 'bit_utils.dart';
-import 'compression_method.dart';
+import 'cp437.dart';
 import 'model/aes_extra_data_record.dart';
-import 'model/aes_key_strength.dart';
-import 'model/aes_version.dart';
 import 'model/central_directory.dart';
+import 'model/compression_method.dart';
 import 'model/digital_signature.dart';
+import 'model/encryption_method.dart';
 import 'model/end_of_central_directory_record.dart';
 import 'model/extra_data_record.dart';
 import 'model/file_header.dart';
@@ -23,15 +25,16 @@ import 'zip_constants.dart';
 import 'zip_exception.dart';
 
 Encoding _getEncoding(Uint8List flag, Encoding? encoding) {
-  return isBitSet(flag[1], 3) ? utf8 : encoding ?? latin1;
+  return isBitSet(flag[1], 3) ? utf8 : (encoding ?? cp437);
 }
 
-Future<String> _readFileName(
-    BufferedSource source, int nameLength, Encoding encoding) async {
-  if (nameLength > 0) {
-    return source.readString(count: nameLength, encoding: encoding);
-  } else {
-    throw ZipException('Invalid entry name in file header');
+Future<String> _readString(
+    BufferedSource source, int length, Encoding encoding) async {
+  final bytes = await source.readBytes(length);
+  try {
+    return encoding.decode(bytes);
+  } catch (_) {
+    return String.fromCharCodes(bytes);
   }
 }
 
@@ -44,167 +47,109 @@ Stream<ExtraDataRecord> _readExtraDataRecords(
   }
   int count = 0;
   while (count < extraFieldLength) {
-    final header = await source.readUint16(Endian.little);
+    final signature = await source.readUint16(Endian.little);
     final size = await source.readUint16(Endian.little);
     final data = await source.readBytes(size);
     count += 2 + 2 + size;
-    yield ExtraDataRecord(header, size, data);
+    yield ExtraDataRecord(signature, data);
   }
   await source.skip(extraFieldLength - count);
 }
 
-Future<Zip64ExtendedInfo?> _readZip64ExtendedInfo(BufferedSource source,
-    List<ExtraDataRecord> records, int compressedSize, int uncompressedSize,
-    [int? diskNumberStart, int? offsetLocalHeader]) async {
+(AesExtraDataRecord, CompressionMethod)? _readAesExtraDataRecord(
+    List<ExtraDataRecord> records) {
   for (final record in records) {
-    if (record.header == zip64extsig) {
-      if (record.size == 0) return null;
-      int count = 0;
-      final buffer = Buffer()..writeFromBytes(Uint8List.fromList(record.data));
-      int? newUncompressedSize;
-      if (count < record.size && uncompressedSize == zip64sizelimit) {
-        newUncompressedSize = buffer.readUint64(Endian.little);
-        count += 8;
-      }
-      int? newCompressedSize;
-      if (count < record.size && compressedSize == zip64sizelimit) {
-        newCompressedSize = buffer.readUint64(Endian.little);
-        count += 8;
-      }
-      int? newOffsetLocalHeader;
-      if (count < record.size && offsetLocalHeader == zip64sizelimit) {
-        newOffsetLocalHeader = buffer.readUint64(Endian.little);
-        count += 8;
-      }
-      int? newDiskNumberStart;
-      if (count < record.size && diskNumberStart == zip64numlimit) {
-        newDiskNumberStart = buffer.readUint32(Endian.little);
-      }
-      return Zip64ExtendedInfo(newCompressedSize, newUncompressedSize,
-          newOffsetLocalHeader, newDiskNumberStart);
-    }
-  }
-  return null;
-}
-
-Future<AESExtraDataRecord?> _readAesExtraDataRecord(
-    BufferedSource source, List<ExtraDataRecord> records) async {
-  for (final record in records) {
-    if (record.header == aesextdatarec) {
-      if (record.size != 7) {
+    if (record.signature == kAesextdatarec) {
+      if (record.data.length != 7) {
         throw ZipException('corrupt AES extra data records');
       }
-      final buffer = Buffer()..writeFromBytes(Uint8List.fromList(record.data));
+      final buffer = Buffer()..writeFromBytes(record.data);
       final aesVersion =
           AesVersion.fromVersionNumber(buffer.readUint16(Endian.little));
-      final vendorID = buffer.readString(count: 2);
+      final vendorID = buffer.readString(count: 2, encoding: cp437);
       final aesKeyStrength = AesKeyStrength.fromRawCode(buffer.readUint8());
       final compressionMethod =
           CompressionMethod.fromCode(buffer.readUint16(Endian.little));
-      return AESExtraDataRecord(
-          record.size, aesVersion, vendorID, aesKeyStrength, compressionMethod);
+      return (
+        AesExtraDataRecord(aesVersion, vendorID, aesKeyStrength),
+        compressionMethod
+      );
     }
   }
   return null;
 }
 
 class FileHeaderReader {
-  const FileHeaderReader(this._handle, [this._encoding = utf8]);
+  FileHeaderReader(this._file, [this._encoding]);
 
-  final FileHandle _handle;
-  final Encoding _encoding;
+  final File _file;
+  final Encoding? _encoding;
 
   Future<ZipModel> parse() async {
-    final length = await _handle.length();
-    if (length < endhdr) {
+    final length = await _file.length();
+    if (length < kEndhdr) {
       throw ZipException(
           'Zip file size less than size of zip headers. Probably not a zip file.');
     }
-
-    final eocdrec = await _readEndOfCentralDirectoryRecord();
-    Zip64EndOfCentralDirectoryLocator? zip64eocdloc;
-    Zip64EndOfCentralDirectoryRecord? zip64eocdrec;
-    CentralDirectory? centralDirectory;
-    if (eocdrec.totalNumberOfEntriesInCentralDirectory == 0) {
-      // no entries
-    } else {
+    return _file.openHandle().use((handle) async {
+      final offset = await _findEocd(handle, length);
+      final eocdrec = await _readEocdrec(handle, offset);
       // If file is Zip64 format, Zip64 headers have to be read before reading central directory
-      zip64eocdloc = await _readZip64EndOfCentralDirectoryLocator(
-          eocdrec.offsetEndOfCentralDirectory);
+      final zip64eocdloc = await _readZip64Eocdloc(handle, offset);
+      Zip64EndOfCentralDirectoryRecord? zip64eocdrec;
       if (zip64eocdloc != null) {
-        zip64eocdrec = await _readZip64EndCentralDirectoryRecord(zip64eocdloc);
+        zip64eocdrec = await _readZip64Eocdrec(handle, zip64eocdloc);
       }
-      final int offsetStartOfCentralDirectory;
-      final int numberOfEntriesInCentralDirectory;
-      if (zip64eocdrec != null) {
-        offsetStartOfCentralDirectory =
-            zip64eocdrec.offsetStartCentralDirectoryWRTStartDiskNumber;
-        numberOfEntriesInCentralDirectory =
-            zip64eocdrec.totalNumberOfEntriesInCentralDirectory;
-      } else {
-        offsetStartOfCentralDirectory = eocdrec.offsetStartOfCentralDirectory;
-        numberOfEntriesInCentralDirectory =
-            eocdrec.totalNumberOfEntriesInCentralDirectory;
-      }
-      centralDirectory = await _readCentralDirectory(
-          offsetStartOfCentralDirectory, numberOfEntriesInCentralDirectory);
-    }
-    return ZipModel(eocdrec, zip64eocdloc, zip64eocdrec, centralDirectory);
+      final centralDir =
+          await _readCentralDirectory(handle, eocdrec, zip64eocdrec);
+      return ZipModel(centralDir, zip64eocdrec, zip64eocdloc, eocdrec);
+    });
   }
 
-  Future<EndOfCentralDirectoryRecord> _readEndOfCentralDirectoryRecord() async {
-    final offset = await _locateOffsetOfEndOfCentralDirectory();
-    return _handle.source(offset + 4).buffered().use((e) async {
+  Future<EndOfCentralDirectoryRecord> _readEocdrec(
+      FileHandle handle, int offset) {
+    return handle.source(offset + 4).buffered().use((source) async {
       return EndOfCentralDirectoryRecord(
-        await e.readUint16(Endian.little),
-        await e.readUint16(Endian.little),
-        await e.readUint16(Endian.little),
-        await e.readUint16(Endian.little),
-        await e.readUint32(Endian.little),
-        await e.readUint32(Endian.little),
-        offset,
+        await source.readUint16(Endian.little),
+        await source.readUint16(Endian.little),
+        await source.readUint16(Endian.little),
+        await source.readUint16(Endian.little),
+        await source.readUint32(Endian.little),
+        await source.readUint32(Endian.little),
         await () async {
-          final length = await e.readUint16(Endian.little);
+          final length = await source.readUint16(Endian.little);
           if (length == 0) return null;
-          try {
-            return await e.readString(count: length);
-          } catch (_) {
-            // Ignore any exception and set comment to null if comment cannot be read
-            return null;
-          }
+          return await _readString(source, length, _encoding ?? cp437);
         }(),
       );
     });
   }
 
-  Future<int> _locateOffsetOfEndOfCentralDirectory() async {
-    final length = await _handle.length();
-    final sig = await _handle
-        .source(length - endhdr)
-        .buffered()
-        .use((e) => e.readInt32(Endian.little));
-    if (sig == endsig) {
-      return length - endhdr;
-    } else {
-      var currentFilePointer = length - endhdr;
-      var numberOfBytesToRead =
-          length < maxCommentSize ? length : maxCommentSize;
-      while (numberOfBytesToRead > 0 && currentFilePointer > 0) {
-        final sig = await _handle
-            .source(--currentFilePointer)
-            .buffered()
-            .use((e) => e.readInt32(Endian.little));
-        if (sig == endsig) {
-          return currentFilePointer;
-        }
-        numberOfBytesToRead--;
+  Future<int> _findEocd(FileHandle handle, int length) async {
+    // Scan backwards from the end of the file looking for the END_OF_CENTRAL_DIRECTORY_SIGNATURE.
+    // If this file has no comment we'll see it on the first attempt; otherwise we have to go
+    // backwards byte-by-byte until we reach it. (The number of bytes scanned will equal the comment
+    // size).
+    var scanOffset = length - kEndhdr;
+    if (scanOffset < 0) throw ZipException('not a zip: size=$length');
+    final stopOffset = max(scanOffset - 65536, 0);
+    while (true) {
+      final sig = await handle
+          .source(scanOffset)
+          .buffered()
+          .use((source) => source.readInt32(Endian.little));
+      if (sig == kEndsig) return scanOffset;
+
+      scanOffset--;
+      if (scanOffset < stopOffset) {
+        throw ZipException(
+            'not a zip: end of central directory signature not found');
       }
-      throw ZipException('Zip headers not found. Probably not a zip file');
     }
   }
 
-  Future<Zip64EndOfCentralDirectoryLocator?>
-      _readZip64EndOfCentralDirectoryLocator(int offsetEndOfCentralDirectory) {
+  Future<Zip64EndOfCentralDirectoryLocator?> _readZip64Eocdloc(
+      FileHandle handle, int offset) {
     // Now the file pointer is at the end of signature of Central Dir Rec
     // Seek back with the following values
     // 4 -> total number of disks
@@ -212,23 +157,20 @@ class FileHeaderReader {
     // 4 -> number of the disk with the start of the zip64 end of central directory
     // 4 -> zip64 end of central dir locator signature
     // Refer to Appnote for more information
-    return _handle
-        .source(offsetEndOfCentralDirectory - 4 - 8 - 4 - 4)
-        .buffered()
-        .use((closable) async {
-      final sig = await closable.readUint32(Endian.little);
-      if (sig == zip64endsig) {
-        final number = await closable.readUint32(Endian.little);
-        final offset = await closable.readUint64(Endian.little);
-        final total = await closable.readUint32(Endian.little);
+    offset -= (4 + 8 + 4 + 4);
+    if (offset <= 0) return Future.value();
+    return handle.source(offset).buffered().use((source) async {
+      final sig = await source.readUint32(Endian.little);
+      if (sig == kZip64endsig) {
+        final number = await source.readUint32(Endian.little);
+        final offset = await source.readUint64(Endian.little);
+        final total = await source.readUint32(Endian.little);
         return Zip64EndOfCentralDirectoryLocator(number, offset, total);
       } else {
         return null;
       }
     });
   }
-
-  Future<void> close() => _handle.close();
 
   // Zip64 end of central directory record
   // signature                       4 bytes  (0x06064b50)
@@ -248,37 +190,31 @@ class FileHeaderReader {
   // directory with respect to
   // the starting disk number        8 bytes
   // zip64 extensible data sector    (variable size)
-  Future<Zip64EndOfCentralDirectoryRecord> _readZip64EndCentralDirectoryRecord(
-      Zip64EndOfCentralDirectoryLocator eocdloc) async {
-    final offsetStartOfZip64CentralDirectory =
-        eocdloc.offsetZip64EndOfCentralDirectoryRecord;
-    return _handle
-        .source(offsetStartOfZip64CentralDirectory)
+  Future<Zip64EndOfCentralDirectoryRecord> _readZip64Eocdrec(
+      FileHandle handle, Zip64EndOfCentralDirectoryLocator eocdloc) async {
+    return handle
+        .source(eocdloc.offsetZip64EndOfCentralDirectoryRecord)
         .buffered()
-        .use((closable) async {
-      final sig = await closable.readUint32(Endian.little);
-      if (sig == zip64censig) {
-        final sizeOfZip64EndCentralDirectoryRecord =
-            await closable.readUint64(Endian.little);
+        .use((source) async {
+      final sig = await source.readUint32(Endian.little);
+      if (sig == kZip64censig) {
+        // size of Zip64 EndCentralDirectoryRecord
+        final size = await source.readUint64(Endian.little);
         return Zip64EndOfCentralDirectoryRecord(
-          sizeOfZip64EndCentralDirectoryRecord,
-          await closable.readUint16(Endian.little),
-          await closable.readUint16(Endian.little),
-          await closable.readUint32(Endian.little),
-          await closable.readUint32(Endian.little),
-          await closable.readUint64(Endian.little),
-          await closable.readUint64(Endian.little),
-          await closable.readUint64(Endian.little),
-          await closable.readUint64(Endian.little),
+          await source.readUint16(Endian.little),
+          await source.readUint16(Endian.little),
+          await source.readUint32(Endian.little),
+          await source.readUint32(Endian.little),
+          await source.readUint64(Endian.little),
+          await source.readUint64(Endian.little),
+          await source.readUint64(Endian.little),
+          await source.readUint64(Endian.little),
           await () async {
             // zip64 extensible data sector
             // 44 is the size of fixed variables in this record
-            // not needed for now!!!
-
-            // final size = sizeOfZip64EndCentralDirectoryRecord -44;
-            // if (size > 0) {
-            //   return await closable.readBytes(size);
-            // }
+            if (size - 44 > 0) {
+              return await source.readBytes(size - 44);
+            }
             return const <int>[];
           }(),
         );
@@ -290,154 +226,179 @@ class FileHeaderReader {
   }
 
   Future<CentralDirectory> _readCentralDirectory(
-      int offsetStartOfCentralDirectory,
-      int numberOfEntriesInCentralDirectory) async {
-    return _handle
-        .source(offsetStartOfCentralDirectory)
-        .buffered()
-        .use((closable) async {
+      FileHandle handle,
+      EndOfCentralDirectoryRecord eocdrec,
+      Zip64EndOfCentralDirectoryRecord? zip64eocdrec) async {
+    final offset = zip64eocdrec?.offsetOfCentralDirectory ??
+        eocdrec.offsetOfCentralDirectory;
+    final number = zip64eocdrec?.totalNumberOfEntriesInCentralDirectory ??
+        eocdrec.totalNumberOfEntriesInCentralDirectory;
+    return handle.source(offset).buffered().use((source) async {
       final headers = <FileHeader>[];
-      for (var i = 0; i < numberOfEntriesInCentralDirectory; i++) {
-        final sig = await closable.readUint32(Endian.little);
-        if (sig != censig) {
+      for (var i = 0; i < number; i++) {
+        final sig = await source.readUint32(Endian.little);
+        if (sig != kCensig) {
           throw ZipException(
               'Expected central directory entry not found (#${i + 1})');
         }
-        final Uint8List generalPurposeFlag;
-        final int compressedSize, uncompressedSize, diskNumberStart;
-        final int offsetLocalHeader;
-        final int fileNameLength, extraFieldLength, fileCommentLength;
-        final List<ExtraDataRecord> extraDataRecords;
-
+        final versionMadeBy = await source.readUint16(Endian.little);
+        final versionNeeded = await source.readUint16(Endian.little);
+        final generalPurposeFlag = await source.readBytes(2);
+        final compressionMethod =
+            CompressionMethod.fromCode(await source.readUint16(Endian.little));
+        final lastModifiedTime = await source.readUint32(Endian.little);
+        final crc = await source.readUint32(Endian.little);
+        final compressedSize = await source.readUint32(Endian.little);
+        final uncompressedSize = await source.readUint32(Endian.little);
+        final fileNameLength = await source.readUint16(Endian.little);
+        final extraFieldLength = await source.readUint16(Endian.little);
+        final fileCommentLength = await source.readUint16(Endian.little);
+        final diskNumberStart = await source.readUint16(Endian.little);
+        final internalFileAttributes = await source.readBytes(2);
+        final externalFileAttributes = await source.readBytes(4);
+        final offsetLocalHeader = await source.readUint32(Endian.little);
+        final fileName = await () async {
+          if (fileNameLength > 0) {
+            return _readString(source, fileNameLength,
+                _getEncoding(generalPurposeFlag, _encoding));
+          } else {
+            throw ZipException('Invalid entry name in file header');
+          }
+        }();
+        final extraDataRecords =
+            await _readExtraDataRecords(source, extraFieldLength).toList();
+        Zip64ExtendedInfo? zip64ExtendedInfo;
+        for (final record in extraDataRecords) {
+          if (record.signature == kZip64extsig) {
+            final buffer = Buffer()..writeFromBytes(record.data);
+            final $uncompressedSize =
+                buffer.request(8) && uncompressedSize == kZip64sizelimit
+                    ? buffer.readUint64(Endian.little)
+                    : null;
+            final $compressedSize =
+                buffer.request(8) && compressedSize == kZip64sizelimit
+                    ? buffer.readUint64(Endian.little)
+                    : null;
+            final $offsetLocalHeader =
+                buffer.request(8) && offsetLocalHeader == kZip64sizelimit
+                    ? buffer.readUint64(Endian.little)
+                    : null;
+            final $diskNumberStart =
+                buffer.request(4) && diskNumberStart == kZip64numlimit
+                    ? buffer.readUint32(Endian.little)
+                    : null;
+            zip64ExtendedInfo = Zip64ExtendedInfo(
+              $compressedSize,
+              $uncompressedSize,
+              $offsetLocalHeader,
+              $diskNumberStart,
+            );
+            break;
+          }
+        }
+        final aesData = _readAesExtraDataRecord(extraDataRecords);
+        final fileComment = await () {
+          if (fileCommentLength > 0) {
+            return _readString(source, fileCommentLength,
+                _getEncoding(generalPurposeFlag, _encoding));
+          }
+          return null;
+        }();
         final header = FileHeader(
-          // versionMadeBy
-          await closable.readUint16(Endian.little),
-          // versionNeededToExtract
-          await closable.readUint16(Endian.little),
-          // generalPurposeFlag
-          generalPurposeFlag = await closable.readBytes(2),
-          // compressionMethod
-          CompressionMethod.fromCode(await closable.readUint16(Endian.little)),
-          // lastModifiedTime
-          await closable.readUint32(Endian.little),
-          // crc
-          await closable.readUint32(Endian.little),
-          // compressedSize
-          compressedSize = await closable.readUint32(Endian.little),
-          // uncompressedSize
-          uncompressedSize = await closable.readUint32(Endian.little),
-          // fileNameLength
-          fileNameLength = await closable.readUint16(Endian.little),
-          // extraFieldLength
-          extraFieldLength = await closable.readUint16(Endian.little),
-          // fileCommentLength
-          fileCommentLength = await closable.readUint16(Endian.little),
-          // diskNumberStart
-          diskNumberStart = await closable.readUint16(Endian.little),
-          // internalFileAttributes
-          await closable.readBytes(2),
-          // externalFileAttributes
-          await closable.readBytes(4),
-          // offsetLocalHeader
-          offsetLocalHeader = await closable.readUint32(Endian.little),
-          // fileName
-          await _readFileName(closable, fileNameLength,
-              _getEncoding(generalPurposeFlag, _encoding)),
-          // extraDataRecords
-          extraDataRecords =
-              await _readExtraDataRecords(closable, extraFieldLength).toList(),
-          // zip64ExtendedInfo
-          await _readZip64ExtendedInfo(
-              closable,
-              extraDataRecords,
-              compressedSize,
-              uncompressedSize,
-              diskNumberStart,
-              offsetLocalHeader),
-          // aesExtraDataRecord
-          await _readAesExtraDataRecord(closable, extraDataRecords),
-          // fileComment
-          await () {
-            if (fileCommentLength > 0) {
-              return closable.readString(
-                  count: fileCommentLength,
-                  encoding: _getEncoding(generalPurposeFlag, _encoding));
-            }
-            return null;
-          }(),
+          versionMadeBy,
+          versionNeeded,
+          generalPurposeFlag,
+          aesData?.$2 ?? compressionMethod,
+          lastModifiedTime,
+          crc,
+          compressedSize,
+          uncompressedSize,
+          diskNumberStart,
+          internalFileAttributes,
+          externalFileAttributes,
+          offsetLocalHeader,
+          fileName,
+          zip64ExtendedInfo,
+          aesData?.$1,
+          fileComment,
         );
         headers.add(header);
       }
 
       // read digital signature
-      final sig = await closable.readUint32(Endian.little);
-      int? digsigSize;
-      String? digsigSignatureData;
-      if (sig == digsig) {
-        digsigSize = await closable.readUint16(Endian.little);
-        if (digsigSize > 0) {
-          digsigSignatureData = await closable.readString(count: digsigSize);
-        }
+      DigitalSignature? signature;
+      if (await source.readUint32(Endian.little) == kDigsig) {
+        final size = await source.readUint16(Endian.little);
+        final signatureData = await source.readBytes(size);
+        signature = DigitalSignature(signatureData);
       }
-      final signature = DigitalSignature(digsigSize, digsigSignatureData);
       return CentralDirectory(headers, signature);
     });
   }
 }
 
 class LocalFileHeaderReader {
-  LocalFileHeaderReader(this._source, [this._encoding = utf8]);
+  LocalFileHeaderReader(this._source, [this._encoding]);
 
   final BufferedSource _source;
-  final Encoding _encoding;
+  final Encoding? _encoding;
 
   Future<LocalFileHeader?> parse() async {
     var sig = await _source.readUint32(Endian.little);
-    if (sig == temspmaker) {
+    if (sig == kTemspmaker) {
       sig = await _source.readUint32(Endian.little);
     }
-    if (sig != locsig) return null;
-    final Uint8List generalPurposeFlag;
-    final int compressedSize, uncompressedSize;
-    final int fileNameLength, extraFieldLength;
-    final List<ExtraDataRecord> extraDataRecords;
+    if (sig != kLocsig) return null;
+    final versionNeeded = await _source.readInt16(Endian.little);
+    final generalPurposeFlag = await () async {
+      final flag = await _source.readBytes(2);
+      if (flag.length != 2) {
+        throw ZipException(
+            'Could not read enough bytes for generalPurposeFlags');
+      }
+      return flag;
+    }();
+    final compressionMethod =
+        CompressionMethod.fromCode(await _source.readUint16(Endian.little));
+    final lastModifiedTime = await _source.readUint32(Endian.little);
+    final crc = await _source.readUint32(Endian.little);
+    final compressedSize = await _source.readUint32(Endian.little);
+    final uncompressedSize = await _source.readUint32(Endian.little);
+    final fileNameLength = await _source.readUint16(Endian.little);
+    final extraFieldLength = await _source.readUint16(Endian.little);
+    final fileName = await () async {
+      if (fileNameLength > 0) {
+        final encoding = _getEncoding(generalPurposeFlag, _encoding);
+        return _readString(_source, fileNameLength, encoding);
+      } else {
+        throw ZipException('Invalid entry name in local file header');
+      }
+    }();
+    final extraDataRecords =
+        await _readExtraDataRecords(_source, extraFieldLength).toList();
+    LocalZip64ExtendedInfo? zip64ExtendedInfo;
+    for (final record in extraDataRecords) {
+      if (record.signature == kZip64extsig) {
+        final buffer = Buffer()..writeFromBytes(record.data);
+        zip64ExtendedInfo = LocalZip64ExtendedInfo(
+          buffer.readUint64(Endian.little),
+          buffer.readUint64(Endian.little),
+        );
+        break;
+      }
+    }
+    final aesData = _readAesExtraDataRecord(extraDataRecords);
     return LocalFileHeader(
-      // versionNeededToExtract
-      await _source.readInt16(Endian.little),
-      // generalPurposeFlag
-      generalPurposeFlag = await () async {
-        final flag = await _source.readBytes(2);
-        if (flag.length != 2) {
-          throw ZipException(
-              'Could not read enough bytes for generalPurposeFlags');
-        }
-        return flag;
-      }(),
-      // compressionMethod
-      CompressionMethod.fromCode(await _source.readUint16(Endian.little)),
-      // lastModifiedTime
-      await _source.readUint32(Endian.little),
-      // crc
-      await _source.readUint32(Endian.little),
-      // compressedSize
-      compressedSize = await _source.readUint32(Endian.little),
-      // uncompressedSize
-      uncompressedSize = await _source.readUint32(Endian.little),
-      // fileNameLength
-      fileNameLength = await _source.readUint16(Endian.little),
-      // extraFieldLength
-      extraFieldLength = await _source.readUint16(Endian.little),
-      // fileName
-      await _readFileName(
-          _source, fileNameLength, _getEncoding(generalPurposeFlag, _encoding)),
-      // extraDataRecords
-      extraDataRecords =
-          await _readExtraDataRecords(_source, extraFieldLength).toList(),
-      // zip64ExtendedInfo
-      await _readZip64ExtendedInfo(
-          _source, extraDataRecords, compressedSize, uncompressedSize),
-      // aesExtraDataRecord
-      await _readAesExtraDataRecord(_source, extraDataRecords),
+      versionNeeded,
+      generalPurposeFlag,
+      aesData?.$2 ?? compressionMethod,
+      lastModifiedTime,
+      crc,
+      compressedSize,
+      uncompressedSize,
+      fileName,
+      zip64ExtendedInfo,
+      aesData?.$1,
     );
   }
 }

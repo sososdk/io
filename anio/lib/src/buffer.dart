@@ -3,12 +3,14 @@ part of 'anio.dart';
 /// A collection of bytes in memory.
 class Buffer implements BufferedSource, BufferedSink {
   @internal
-  @visibleForTesting
   Segment? head;
 
   int _length = 0;
 
   int get length => _length;
+
+  @internal
+  set length(int value) => _length = value;
 
   bool get isEmpty => _length == 0;
 
@@ -28,14 +30,14 @@ class Buffer implements BufferedSource, BufferedSink {
   @override
   int read(Buffer sink, int count) {
     checkArgument(count >= 0, 'count < 0: $count');
-    if (_length == 0) return 0;
+    if (isEmpty) return 0;
     if (count > _length) count = _length;
     sink.write(this, count);
     return count;
   }
 
   @override
-  bool exhausted() => _length == 0;
+  bool exhausted() => isEmpty;
 
   @override
   bool request(int count) => _length >= count;
@@ -227,7 +229,7 @@ class Buffer implements BufferedSource, BufferedSink {
   String? readLine({Encoding encoding = utf8, int? newline}) {
     newline ??= indexOf(kLF);
     if (newline == -1) {
-      if (_length == 0) {
+      if (isEmpty) {
         return null;
       } else {
         return readString(encoding: encoding, count: _length);
@@ -290,7 +292,7 @@ class Buffer implements BufferedSource, BufferedSink {
         final tail = head?.prev;
         if (tail != null &&
             tail.owner &&
-            count + tail.limit - (tail.shared ? 0 : tail.pos) <= kBlockSize) {
+            count + tail.limit - (tail.shared ? 0 : tail.pos) <= Segment.size) {
           // Our existing segments are sufficient. Move bytes from source's head to our tail.
           source.head!.writeTo(tail, count.toInt());
           source._length -= count;
@@ -327,7 +329,7 @@ class Buffer implements BufferedSource, BufferedSink {
     int totalBytes = 0;
     while (true) {
       final int result;
-      final read = source.read(this, kBlockSize);
+      final read = source.read(this, Segment.size);
       if (read is Future<int>) {
         result = await read;
       } else {
@@ -345,7 +347,7 @@ class Buffer implements BufferedSource, BufferedSink {
     var offset = start;
     while (end - offset > 0) {
       final tail = writableSegment(1);
-      final toCopy = min(end - offset, kBlockSize - tail.limit);
+      final toCopy = min(end - offset, Segment.size - tail.limit);
       tail.data.setRange(tail.limit, tail.limit + toCopy, source, offset);
 
       offset += toCopy;
@@ -478,7 +480,7 @@ class Buffer implements BufferedSource, BufferedSink {
 
   @internal
   Segment writableSegment(int minimumCapacity) {
-    checkArgument(minimumCapacity >= 1 && minimumCapacity <= kBlockSize,
+    checkArgument(minimumCapacity >= 1 && minimumCapacity <= Segment.size,
         'unexpected capacity');
 
     if (head == null) {
@@ -486,7 +488,7 @@ class Buffer implements BufferedSource, BufferedSink {
     }
 
     var tail = head!.prev;
-    if (tail.limit + minimumCapacity > kBlockSize || !tail.owner) {
+    if (tail.limit + minimumCapacity > Segment.size || !tail.owner) {
       // Append a new empty segment to fill up.
       tail = tail.push(Segment());
     }
@@ -529,7 +531,7 @@ class Buffer implements BufferedSource, BufferedSink {
 
     // Omit the tail if it's still writable.
     final tail = head!.prev;
-    if (tail.limit < kBlockSize && tail.owner) {
+    if (tail.limit < Segment.size && tail.owner) {
       result -= tail.limit - tail.pos;
     }
 
@@ -562,7 +564,7 @@ class Buffer implements BufferedSource, BufferedSink {
     if (identical(this, other)) return true;
     if (other is! Buffer) return false;
     if (_length != other._length) return false;
-    if (_length == 0) return true; // Both buffers are empty.
+    if (isEmpty) return true; // Both buffers are empty.
 
     var sa = head!;
     var sb = other.head!;
@@ -626,8 +628,13 @@ class Buffer implements BufferedSource, BufferedSink {
   String toString() => asBytes().toString();
 }
 
-@internal
 class Segment {
+  /// The size of all segments in bytes.
+  static const int size = 8192;
+
+  /// Segments will be shared when doing so avoids `arraycopy()` of this many bytes.
+  static const int shareMinimum = 1024;
+
   final Uint8List data;
 
   /// The next byte of application data byte to read in this segment.
@@ -657,7 +664,7 @@ class Segment {
     this.limit = 0,
     this.shared = false,
     this.owner = true,
-  }) : data = data ?? Uint8List(kBlockSize) {
+  }) : data = data ?? Uint8List(size) {
     prev = this;
     next = this;
   }
@@ -712,7 +719,7 @@ class Segment {
     //  - Avoid short shared segments. These are bad for performance because they are readonly and
     //    may lead to long chains of short segments.
     // To balance these goals we only share segments when the copy will be large.
-    if (count >= kShareMinimum) {
+    if (count >= shareMinimum) {
       prefix = sharedCopy();
     } else {
       prefix = Segment();
@@ -731,8 +738,7 @@ class Segment {
     checkArgument(!identical(prev, this), 'cannot compact');
     if (!prev.owner) return; // Cannot compact: prev isn't writable.
     final count = limit - pos;
-    final availableCount =
-        kBlockSize - prev.limit + (prev.shared ? 0 : prev.pos);
+    final availableCount = size - prev.limit + (prev.shared ? 0 : prev.pos);
     // Cannot compact: not enough writable space.
     if (count > availableCount) return;
     writeTo(prev, count);
@@ -742,10 +748,10 @@ class Segment {
   /// Moves [count] bytes from this segment to `sink`.
   void writeTo(Segment sink, int count) {
     checkArgument(sink.owner, 'only owner can write');
-    if (sink.limit + count > kBlockSize) {
+    if (sink.limit + count > size) {
       // We can't fit count bytes at the sink's current position. Shift sink first.
       if (sink.shared) throw ArgumentError();
-      if (sink.limit + count - sink.pos > kBlockSize) throw ArgumentError();
+      if (sink.limit + count - sink.pos > size) throw ArgumentError();
       sink.data.setRange(0, sink.limit - sink.pos, sink.data, sink.pos);
       sink.limit -= sink.pos;
       sink.pos = 0;

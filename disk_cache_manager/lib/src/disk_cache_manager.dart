@@ -258,10 +258,13 @@ class TransparentTransformer implements Transformer<CacheResponse, void> {
 
 typedef ProgressCallback = void Function(double percent);
 
-class _CacheSourceBody extends ForwardingSource {
-  _CacheSourceBody(this.snapshot) : super(snapshot.getSource(_kEntryBody));
+class _CacheSourceBody with ForwardingSource {
+  _CacheSourceBody(this.snapshot) : delegate = snapshot.getSource(_kEntryBody);
 
   final Snapshot snapshot;
+
+  @override
+  final Source delegate;
 
   @override
   Future<void> close() async {
@@ -397,8 +400,11 @@ class _DefaultFetcher implements Fetcher {
   }
 }
 
-class _ReceivedSource extends ForwardingSource {
-  _ReceivedSource(super.delegate);
+class _ReceivedSource with ForwardingSource {
+  _ReceivedSource(this.delegate);
+
+  @override
+  final Source delegate;
 
   void Function(int reveived)? listener;
   int _received = 0;

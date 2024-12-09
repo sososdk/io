@@ -10,7 +10,7 @@ import 'package:test/test.dart';
 
 import 'mock_sink.dart';
 
-const kSegmentSize = kBlockSize;
+const kSegmentSize = Segment.size;
 
 void main() {
   group('buffer', () {
@@ -912,6 +912,107 @@ void main() {
           throwsA(isA<StateError>()),
         );
       });
+    });
+  });
+
+  group('peek', () {
+    test('peek', () async {
+      final buffer = Buffer()..writeString('abcdefghi');
+      expect('abc', buffer.readString(count: 3));
+      final peek = buffer.peek();
+      expect('def', await peek.readString(count: 3));
+      expect('ghi', await peek.readString(count: 3));
+      expect(await peek.request(1), false);
+      expect('def', buffer.readString(count: 3));
+    });
+
+    test('peek multiple', () async {
+      final buffer = Buffer()..writeString('abcdefghi');
+      expect('abc', buffer.readString(count: 3));
+      final peek1 = buffer.peek();
+      final peek2 = buffer.peek();
+      expect('def', await peek1.readString(count: 3));
+      expect('def', await peek2.readString(count: 3));
+      expect('ghi', await peek2.readString(count: 3));
+      expect(await peek2.request(1), false);
+      expect('ghi', await peek1.readString(count: 3));
+      expect(await peek1.request(1), false);
+      expect('def', buffer.readString(count: 3));
+    });
+
+    test('peek large', () async {
+      final buffer = Buffer()..writeString('abcdef');
+      buffer.writeString('g' * 2 * kSegmentSize);
+      buffer.writeString('hij');
+      expect('abc', buffer.readString(count: 3));
+      final peek = buffer.peek();
+      expect('def', await peek.readString(count: 3));
+      await peek.skip(2 * kSegmentSize);
+      expect('hij', await peek.readString(count: 3));
+      expect(await peek.request(1), false);
+      expect('def', buffer.readString(count: 3));
+      buffer.skip(2 * kSegmentSize);
+      expect('hij', buffer.readString(count: 3));
+    });
+
+    test('peek invalid', () async {
+      final buffer = Buffer()..writeString('abcdefghi');
+      expect('abc', buffer.readString(count: 3));
+      final peek = buffer.peek();
+      expect('def', await peek.readString(count: 3));
+      expect('ghi', await peek.readString(count: 3));
+      expect(await peek.request(1), false);
+      expect('def', buffer.readString(count: 3));
+      try {
+        await peek.readString();
+        fail('should fail');
+      } on StateError catch (e) {
+        expect('Peek source is invalid because upstream source was used',
+            e.message);
+      }
+    });
+
+    test('peek segment then invalid', () async {
+      final buffer = Buffer()..writeString('abc');
+      buffer.writeString('d' * 2 * kSegmentSize);
+      expect('abc', buffer.readString(count: 3));
+
+      // Peek a little data and skip the rest of the upstream source
+      final peek = buffer.peek();
+      expect('ddd', await peek.readString(count: 3));
+      buffer.clear();
+
+      // Skip the rest of the buffered data
+      await peek.skip(peek.buffer.length);
+      try {
+        await peek.readInt8();
+        fail('should fail');
+      } on StateError catch (e) {
+        expect('Peek source is invalid because upstream source was used',
+            e.message);
+      }
+    });
+
+    test('peek doesnt read too much', () async {
+      // 6 bytes in source's buffer plus 3 bytes upstream.
+      final buffer = Buffer()..writeString('abcdef');
+      buffer.require(6);
+      buffer.writeString('ghi');
+      final peek = buffer.peek();
+
+      // Read 3 bytes. This reads some of the buffered data.
+      expect(await peek.request(3), true);
+      expect('abc', await peek.readString(count: 3));
+
+      // Read 3 more bytes. This exhausts the buffered data.
+      expect(await peek.request(3), true);
+      expect('def', await peek.readString(count: 3));
+
+      // Read 3 more bytes. This draws new bytes.
+      expect(await peek.request(3), true);
+      expect(9, buffer.buffer.length);
+      expect(3, peek.buffer.length);
+      expect('ghi', await peek.readString(count: 3));
     });
   });
 }

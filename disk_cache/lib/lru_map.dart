@@ -1,3 +1,3 @@
-library lru_map;
+library;
 
 export 'src/lru_map.dart';

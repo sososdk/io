@@ -1,14 +1,15 @@
 part of 'zip_entry_source.dart';
 
 abstract class _DecompressSource implements Source {
-  _DecompressSource(Source source) : source = source.buffered();
+  _DecompressSource(this.source);
 
-  static _DecompressSource create(Source source, LocalFileHeader header) {
+  static _DecompressSource create(
+      BufferedSource source, LocalFileHeader header) {
     return switch (header.compressionMethod) {
-      CompressionMethod.store => _StoreSource(source),
-      CompressionMethod.deflate => _InflaterSource(source),
+      CompressionStore() => _StoreSource(source),
+      CompressionDeflate() => _InflaterSource(source),
       _ => throw ZipException(
-          'Entry [${header.fileName}] ${header.compressionMethod} not supported'),
+          'Entry [${header.name}] ${header.compressionMethod} not supported'),
     };
   }
 

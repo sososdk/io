@@ -1,158 +1,161 @@
 /// Temporary spanning marker.
-const temspmaker = 0x30304b50; // See APPNOTE.TXT 8.5.4
+const kTemspmaker = 0x30304b50; // See APPNOTE.TXT 8.5.4
 
 /// Local file (LOC) header signature.
-const locsig = 0x04034b50; // "PK\003\004"
+const kLocsig = 0x04034b50; // "PK\003\004"
 
 /// Extra local (EXT) header signature.
-const extsig = 0x08074b50; // "PK\007\008"
+const kExtsig = 0x08074b50; // "PK\007\008"
 
 /// Central directory (CEN) header signature.
-const censig = 0x02014b50; // "PK\001\002"
+const kCensig = 0x02014b50; // "PK\001\002"
 
 /// End of central directory (END) header signature.
-const endsig = 0x06054b50; // "PK\005\006"
+const kEndsig = 0x06054b50; // "PK\005\006"
 
 // ZIP64 end of central directory locator (END) header signature.
-const zip64endsig = 0x07064b50;
+const kZip64endsig = 0x07064b50;
 
 // ZIP64 central directory (CEN) header signature.
-const zip64censig = 0x06064b50;
+const kZip64censig = 0x06064b50;
 
 /// digital signature.
-const digsig = 0x05054b50;
+const kDigsig = 0x05054b50;
 
 /// Local file (LOC) header size in bytes (including signature).
-const lochdr = 30;
+const kLochdr = 30;
 
 /// Extra local (EXT) header size in bytes (including signature).
-const exthdr = 16;
+const kExthdr = 16;
 
 /// Central directory (CEN) header size in bytes (including signature).
-const cenhdr = 46;
+const kCenhdr = 46;
 
 /// End of central directory (END) header size in bytes (including signature).
-const endhdr = 22;
+const kEndhdr = 22;
 
 /// Local file (LOC) header version needed to extract field offset.
-const locver = 4;
+const kLocver = 4;
 
 /// Local file (LOC) header general purpose bit flag field offset.
-const locflg = 6;
+const kLocflg = 6;
 
 /// Local file (LOC) header compression method field offset.
-const lochow = 8;
+const kLochow = 8;
 
 /// Local file (LOC) header modification time field offset.
-const loctim = 10;
+const kLoctim = 10;
 
 /// Local file (LOC) header uncompressed file crc-32 value field offset.
-const loccrc = 14;
+const kLoccrc = 14;
 
 /// Local file (LOC) header compressed size field offset.
-const locsiz = 18;
+const kLocsiz = 18;
 
 /// Local file (LOC) header uncompressed size field offset.
-const loclen = 22;
+const kLoclen = 22;
 
 /// Local file (LOC) header filename length field offset.
-const locnam = 26;
+const kLocnam = 26;
 
 /// Local file (LOC) header extra field length field offset.
-const locext = 28;
+const kLocext = 28;
 
 /// Extra local (EXT) header uncompressed file crc-32 value field offset.
-const extcrc = 4;
+const kExtcrc = 4;
 
 /// Extra local (EXT) header compressed size field offset.
-const extsiz = 8;
+const kExtsiz = 8;
 
 /// Extra local (EXT) header uncompressed size field offset.
-const extlen = 12;
+const kExtlen = 12;
 
 /// Central directory (CEN) header version made by field offset.
-const cenvem = 4;
+const kCenvem = 4;
 
 /// Central directory (CEN) header version needed to extract field offset.
-const cenver = 6;
+const kCenver = 6;
 
 /// Central directory (CEN) header encrypt, decrypt flags field offset.
-const cenflg = 8;
+const kCenflg = 8;
 
 /// Central directory (CEN) header compression method field offset.
-const cenhow = 10;
+const kCenhow = 10;
 
 /// Central directory (CEN) header modification time field offset.
-const centim = 12;
+const kCentim = 12;
 
 /// Central directory (CEN) header uncompressed file crc-32 value field offset.
-const cencrc = 16;
+const kCencrc = 16;
 
 /// Central directory (CEN) header compressed size field offset.
-const censiz = 20;
+const kCensiz = 20;
 
 /// Central directory (CEN) header uncompressed size field offset.
-const cenlen = 24;
+const kCenlen = 24;
 
 /// Central directory (CEN) header filename length field offset.
-const cennam = 28;
+const kCennam = 28;
 
 /// Central directory (CEN) header extra field length field offset.
-const cenext = 30;
+const kCenext = 30;
 
 /// Central directory (CEN) header comment length field offset.
-const cencom = 32;
+const kCencom = 32;
 
 /// Central directory (CEN) header disk number start field offset.
-const cendsk = 34;
+const kCendsk = 34;
 
 /// Central directory (CEN) header internal file attributes field offset.
-const cenatt = 36;
+const kCenatt = 36;
 
 /// Central directory (CEN) header external file attributes field offset.
-const cenatx = 38;
+const kCenatx = 38;
 
 /// Central directory (CEN) header LOC header offset field offset.
-const cenoff = 42;
+const kCenoff = 42;
 
 /// End of central directory (END) header number of entries on this disk field offset.
-const endsub = 8;
+const kEndsub = 8;
 
 /// End of central directory (END) header total number of entries field offset.
-const endtot = 10;
+const kEndtot = 10;
 
 /// End of central directory (END) header central directory size in bytes field offset.
-const endsiz = 12;
+const kEndsiz = 12;
 
 /// End of central directory (END) header offset for the first CEN header field offset.
-const endoff = 16;
+const kEndoff = 16;
 
 /// End of central directory (END) header zip file comment length field offset.
-const endcom = 20;
+const kEndcom = 20;
 
 /// aes extra data record.
-const aesextdatarec = 0x9901;
+const kAesextdatarec = 0x9901;
 
 /// zip64 extra field signature.
-const zip64extsig = 0x0001;
+const kZip64extsig = 0x0001;
 
 /// zip64 size limit.
-const zip64sizelimit = 0xFFFFFFFF;
+const kZip64sizelimit = 0xffffffff;
 
 /// zip64 number of entries limit.
-const zip64numlimit = 0xffff;
+const kZip64numlimit = 0xffff;
 
 /// max comment size.
-const maxCommentSize = 0xffff;
+const kMaxCommentSize = 0xffff;
+
+/// max filename size.
+const kMaxFilenameSize = 0xffff;
 
 /// aes auth length
-const aesAuthLength = 10;
+const kAesAuthLength = 10;
 
 /// aes password verifier length
-const aesVerifierLength = 2;
+const kAesVerifierLength = 2;
 
 /// aes block size
-const aesBlockSize = 16;
+const kAesBlockSize = 16;
 
 /// std dec hdr size
-const stdDecHdrSize = 12;
+const kStdDecHdrSize = 12;

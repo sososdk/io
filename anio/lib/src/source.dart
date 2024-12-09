@@ -181,6 +181,9 @@ class RealBufferedSource implements BufferedSource {
 
   bool _closed = false;
 
+  @internal
+  Source get source => _source;
+
   @override
   Buffer get buffer => _buffer;
 
@@ -190,25 +193,26 @@ class RealBufferedSource implements BufferedSource {
     checkState(!_closed, 'closed');
 
     if (_buffer.isEmpty) {
-      final result = await _source.read(_buffer, kBlockSize);
+      final result = await _source.read(_buffer, Segment.size);
       if (result == 0) return 0;
     }
 
-    return _buffer.read(sink, min(count, _buffer._length));
+    return _buffer.read(sink, min(count, _buffer.length));
   }
 
   @override
   Future<bool> exhausted() async {
     checkState(!_closed, 'closed');
-    return _buffer.exhausted() && await _source.read(_buffer, kBlockSize) == 0;
+    return _buffer.exhausted() &&
+        await _source.read(_buffer, Segment.size) == 0;
   }
 
   @override
   Future<bool> request(int count) async {
     checkArgument(count >= 0, 'byteCount < 0: $count');
     checkState(!_closed, 'closed');
-    while (_buffer._length < count) {
-      if (await _source.read(_buffer, kBlockSize) == 0) return false;
+    while (_buffer.length < count) {
+      if (await _source.read(_buffer, Segment.size) == 0) return false;
     }
     return true;
   }
@@ -222,10 +226,10 @@ class RealBufferedSource implements BufferedSource {
   Future<void> skip(int count) async {
     checkState(!_closed, 'closed');
     while (count > 0) {
-      if (_buffer.isEmpty && await _source.read(_buffer, kBlockSize) == 0) {
+      if (_buffer.isEmpty && await _source.read(_buffer, Segment.size) == 0) {
         throw const EOFException();
       }
-      final skip = min(count, _buffer._length);
+      final skip = min(count, _buffer.length);
       _buffer.skip(skip);
       count -= skip;
     }
@@ -241,9 +245,9 @@ class RealBufferedSource implements BufferedSource {
 
       // The byte wasn't in the buffer. Give up if we've already reached our target size or if the
       // underlying stream is exhausted.
-      final lastBufferLength = _buffer._length;
+      final lastBufferLength = _buffer.length;
       if ((end != null && lastBufferLength >= end) ||
-          await _source.read(_buffer, kBlockSize) == 0) {
+          await _source.read(_buffer, Segment.size) == 0) {
         return -1;
       }
 
@@ -260,8 +264,8 @@ class RealBufferedSource implements BufferedSource {
       final result = _buffer.indexOfBytes(bytes, start, end);
       if (result != -1) return result;
 
-      final lastBufferSize = _buffer._length;
-      if (await _source.read(_buffer, kBlockSize) == 0) return -1;
+      final lastBufferSize = _buffer.length;
+      if (await _source.read(_buffer, Segment.size) == 0) return -1;
 
       // Keep searching, picking up from where we left off.
       start = max(start, lastBufferSize - bytes.length + 1);
@@ -344,7 +348,7 @@ class RealBufferedSource implements BufferedSource {
     end = RangeError.checkValidRange(start, end, sink.length);
     int totalBytes = 0;
     while (end > start) {
-      if (_buffer.isEmpty && await _source.read(_buffer, kBlockSize) == 0) {
+      if (_buffer.isEmpty && await _source.read(_buffer, Segment.size) == 0) {
         return totalBytes;
       }
       final count = _buffer.readIntoBytes(sink, start, end);
@@ -357,16 +361,16 @@ class RealBufferedSource implements BufferedSource {
   @override
   Future<int> readIntoSink(Sink sink) async {
     var totalBytes = 0;
-    while (await _source.read(_buffer, kBlockSize) != 0) {
-      final emitCount = buffer.completeSegmentByteCount();
+    while (await _source.read(_buffer, Segment.size) != 0) {
+      final emitCount = _buffer.completeSegmentByteCount();
       if (emitCount > 0) {
         totalBytes += emitCount;
-        await sink.write(buffer, emitCount);
+        await sink.write(_buffer, emitCount);
       }
     }
-    if (buffer.isNotEmpty) {
-      totalBytes += buffer._length;
-      await sink.write(buffer, buffer._length);
+    if (_buffer.isNotEmpty) {
+      totalBytes += _buffer.length;
+      await sink.write(_buffer, _buffer.length);
     }
     return totalBytes;
   }
@@ -424,7 +428,7 @@ class RealBufferedSource implements BufferedSource {
     for (var i = start; i < end; i++) {
       final bufferOffset = offset + i - start;
       if (!await request(bufferOffset + 1)) return false;
-      if (buffer[bufferOffset] != bytes[i]) return false;
+      if (_buffer[bufferOffset] != bytes[i]) return false;
     }
     return true;
   }
@@ -461,7 +465,7 @@ extension SourceBuffer on Source {
   /// Reads until this is exhausted.
   Future<void> skipAll() async {
     final skipBuffer = Buffer();
-    while (await read(skipBuffer, kBlockSize) != 0) {
+    while (await read(skipBuffer, Segment.size) != 0) {
       skipBuffer.clear();
     }
   }
@@ -475,10 +479,8 @@ extension NullableFutureSourceBuffer on Future<Source?> {
   Future<BufferedSource?> buffered() => then((e) => e?.buffered());
 }
 
-class ForwardingSource implements Source {
-  final Source delegate;
-
-  const ForwardingSource(this.delegate);
+mixin ForwardingSource implements Source {
+  Source get delegate;
 
   @override
   Future<int> read(Buffer sink, int count) async => delegate.read(sink, count);
@@ -536,7 +538,7 @@ class InputSource implements Source {
       await completer.future;
       _completer = null;
     }
-    final length = min(count, _receiveBuffer._length);
+    final length = min(count, _receiveBuffer.length);
     sink.write(_receiveBuffer, length);
     return length;
   }
@@ -580,20 +582,47 @@ class PeekSource implements Source {
       'Peek source is invalid because upstream source was used',
     );
     if (count == 0) return 0;
-    if (!await upstream.request(_pos + 1)) return -1;
+    if (!await upstream.request(_pos + 1)) return 0;
     if (expectedSegment == null && buffer.head != null) {
       // Only once the buffer actually holds data should an expected Segment and position be
-      // recorded. This allows reads from the peek source to repeatedly return -1 and for data to be
+      // recorded. This allows reads from the peek source to repeatedly return 0 and for data to be
       // added later. Unit tests depend on this behavior.
       expectedSegment = buffer.head;
       expectedPos = buffer.head!.pos;
     }
-    final toCopy = min(count, buffer._length - _pos);
-    buffer.copyTo(sink, _pos, toCopy);
+    final toCopy = min(count, buffer.length - _pos);
+    buffer.copyTo(sink, _pos, _pos + toCopy);
     _pos += toCopy;
     return toCopy;
   }
 
   @override
   void close() => _closed = true;
+}
+
+extension LimitedLengthSourceExtension on Source {
+  Source limited(int length) => LimitedLengthSource(this, length);
+}
+
+@internal
+class LimitedLengthSource implements Source {
+  final Source source;
+  final int length;
+
+  LimitedLengthSource(this.source, this.length);
+
+  int bytesReceived = 0;
+
+  @override
+  FutureOr<int> read(Buffer sink, int count) async {
+    if (bytesReceived >= length) return 0;
+
+    count = min(count, length - bytesReceived);
+    final result = await source.read(sink, count);
+    bytesReceived += result;
+    return result;
+  }
+
+  @override
+  FutureOr<void> close() => source.close();
 }

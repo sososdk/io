@@ -5,26 +5,36 @@ import 'zip_64_end_of_central_directory_record.dart';
 
 class ZipModel {
   const ZipModel(
-    this.endOfCentralDirectoryRecord,
-    this.zip64EndOfCentralDirectoryLocator,
-    this.zip64EndOfCentralDirectoryRecord,
     this.centralDirectory,
+    this.zip64EndOfCentralDirectoryRecord,
+    this.zip64EndOfCentralDirectoryLocator,
+    this.endOfCentralDirectoryRecord,
   );
 
-  final EndOfCentralDirectoryRecord endOfCentralDirectoryRecord;
-  final Zip64EndOfCentralDirectoryLocator? zip64EndOfCentralDirectoryLocator;
+  final CentralDirectory centralDirectory;
   final Zip64EndOfCentralDirectoryRecord? zip64EndOfCentralDirectoryRecord;
-  final CentralDirectory? centralDirectory;
+  final Zip64EndOfCentralDirectoryLocator? zip64EndOfCentralDirectoryLocator;
+  final EndOfCentralDirectoryRecord endOfCentralDirectoryRecord;
+
+  bool get isSplitArchive => numberOfDisk > 0;
 
   bool get isZip64Format => zip64EndOfCentralDirectoryLocator != null;
 
-  bool get splitArchive => numberOfThisDisk > 0;
-
-  int get numberOfThisDisk {
+  int get numberOfDisk {
     if (isZip64Format) {
-      return zip64EndOfCentralDirectoryRecord!.numberOfThisDisk;
+      return zip64EndOfCentralDirectoryRecord!.numberOfDisk;
     } else {
-      return endOfCentralDirectoryRecord.numberOfThisDisk;
+      return endOfCentralDirectoryRecord.numberOfDisk;
     }
   }
+
+  int get offsetOfCentralDirectory {
+    if (isZip64Format) {
+      return zip64EndOfCentralDirectoryRecord!.offsetOfCentralDirectory;
+    } else {
+      return endOfCentralDirectoryRecord.offsetOfCentralDirectory;
+    }
+  }
+
+  String? get comment => endOfCentralDirectoryRecord.comment;
 }
