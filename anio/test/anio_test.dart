@@ -430,6 +430,84 @@ void main() {
       expect(4, buf.length);
       expect(1, buffer.length);
     });
+
+    test('starts with', () {
+      final source = Buffer()
+        ..writeString('a' * (kSegmentSize - 1))
+        ..writeString('bcd');
+
+      expect(true, source.startsWith('a'.codeUnits[0]));
+      expect(false, source.startsWith('a'.codeUnits[0], kSegmentSize - 1));
+      expect(true, source.startsWith('a'.codeUnits[0], kSegmentSize - 2));
+      expect(true, source.startsWith('b'.codeUnits[0], kSegmentSize - 1));
+      expect(true, source.startsWith('c'.codeUnits[0], kSegmentSize));
+      expect(false, source.startsWith('d'.codeUnits[0], kSegmentSize));
+
+      expect(false, source.startsWithBytes('abcd'.codeUnits, kSegmentSize - 1));
+      expect(true, source.startsWithBytes('bcd'.codeUnits, kSegmentSize - 1));
+      expect(true, source.startsWithBytes('cd'.codeUnits, kSegmentSize));
+      expect(true, source.startsWithBytes('d'.codeUnits, kSegmentSize + 1));
+      expect(false, source.startsWithBytes('d'.codeUnits, kSegmentSize));
+    });
+
+    test('index of bytes at segment boundary', () {
+      final source = Buffer()
+        ..writeString('a' * (kSegmentSize - 1))
+        ..writeString('bcd');
+      expect(kSegmentSize - 3,
+          source.indexOfBytes('aabc'.codeUnits, kSegmentSize - 4));
+      expect(kSegmentSize - 3,
+          source.indexOfBytes('aabc'.codeUnits, kSegmentSize - 3));
+      expect(kSegmentSize - 2,
+          source.indexOfBytes('abcd'.codeUnits, kSegmentSize - 2));
+      expect(kSegmentSize - 2,
+          source.indexOfBytes('abc'.codeUnits, kSegmentSize - 2));
+      expect(kSegmentSize - 2,
+          source.indexOfBytes('abc'.codeUnits, kSegmentSize - 2));
+      expect(kSegmentSize - 2,
+          source.indexOfBytes('ab'.codeUnits, kSegmentSize - 2));
+      expect(kSegmentSize - 2,
+          source.indexOfBytes('a'.codeUnits, kSegmentSize - 2));
+      expect(kSegmentSize - 1,
+          source.indexOfBytes('bc'.codeUnits, kSegmentSize - 2));
+      expect(kSegmentSize - 1,
+          source.indexOfBytes('b'.codeUnits, kSegmentSize - 2));
+      expect(
+          kSegmentSize, source.indexOfBytes('c'.codeUnits, kSegmentSize - 2));
+      expect(kSegmentSize, source.indexOfBytes('c'.codeUnits, kSegmentSize));
+      expect(kSegmentSize + 1,
+          source.indexOfBytes('d'.codeUnits, kSegmentSize - 2));
+      expect(kSegmentSize + 1,
+          source.indexOfBytes('d'.codeUnits, kSegmentSize + 1));
+    });
+
+    test('index of bytes does not wrap around', () {
+      final source = Buffer()
+        ..writeString('a' * (kSegmentSize - 1))
+        ..writeString('bcd');
+      expect(-1, source.indexOfBytes('abcda'.codeUnits, kSegmentSize - 3));
+    });
+
+    test('index of bytes with offset', () {
+      final source = Buffer();
+      expect(-1, source.indexOfBytes('flop'.codeUnits));
+      source.writeString('flop flip flop');
+      source.emit();
+      expect(10, source.indexOfBytes('flop'.codeUnits, 1));
+      source.skipAll(); // Clear stream
+
+      // Make sure we backtrack and resume searching after partial match.
+      source.writeString('hi hi hi hi hey');
+      expect(6, source.indexOfBytes('hi hi hey'.codeUnits, 1));
+    });
+
+    test('index of bytes with from index', () {
+      final source = Buffer()..writeString('aaa');
+      expect(0, source.indexOfBytes('a'.codeUnits));
+      expect(0, source.indexOfBytes('a'.codeUnits, 0));
+      expect(1, source.indexOfBytes('a'.codeUnits, 1));
+      expect(2, source.indexOfBytes('a'.codeUnits, 2));
+    });
   });
 
   group('sink', () {

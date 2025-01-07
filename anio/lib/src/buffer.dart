@@ -65,16 +65,29 @@ class Buffer implements BufferedSource, BufferedSink {
   }
 
   @override
-  int indexOf(int element, [int start = 0, int? end]) {
-    end = RangeError.checkValidRange(start, end, _length);
-    if (start == end) return -1;
+  bool startsWith(int element, [int fromIndex = 0]) {
+    return indexOf(element, fromIndex, fromIndex + 1) != -1;
+  }
+
+  @override
+  bool startsWithBytes(List<int> bytes, [int fromIndex = 0]) {
+    return indexOfBytes(bytes, fromIndex, fromIndex + bytes.length) != -1;
+  }
+
+  @override
+  int indexOf(int element, [int fromIndex = 0, int? toIndex]) {
+    toIndex ??= _length;
+    checkArgument(fromIndex >= 0 && fromIndex <= toIndex,
+        'fromIndex not in range(0...$toIndex)');
+    if (toIndex > _length) toIndex = _length;
+    if (fromIndex == toIndex) return -1;
     if (head == null) return -1;
-    var (s, offset) = seek(start)!;
+    var (s, offset) = seek(fromIndex)!;
     // Scan through the segments, searching for element.
-    while (offset < end) {
+    while (offset < toIndex) {
       final data = s.data;
-      final limit = min(s.limit, s.pos + end - offset);
-      var pos = s.pos + start - offset;
+      final limit = min(s.limit, s.pos + toIndex - offset);
+      var pos = s.pos + fromIndex - offset;
       while (pos < limit) {
         if (data[pos] == element) {
           return pos - s.pos + offset;
@@ -83,29 +96,32 @@ class Buffer implements BufferedSource, BufferedSink {
       }
       // Not in this segment. Try the next one.
       offset += s.limit - s.pos;
-      start = offset;
+      fromIndex = offset;
       s = s.next;
     }
     return -1;
   }
 
   @override
-  int indexOfBytes(Uint8List bytes, [int start = 0, int? end]) {
+  int indexOfBytes(List<int> bytes, [int fromIndex = 0, int? toIndex]) {
     checkArgument(bytes.isNotEmpty, 'bytes is empty');
-    end = RangeError.checkValidRange(start, end, _length);
-    if (end - start < bytes.length) return -1;
+    toIndex ??= _length;
+    checkArgument(fromIndex >= 0 && fromIndex <= toIndex,
+        'fromIndex($fromIndex) not in range(0...$toIndex)');
+    if (toIndex > _length) toIndex = _length;
+    if (toIndex - fromIndex < bytes.length) return -1;
     if (head == null) return -1;
-    var (s, offset) = seek(start)!;
+    var (s, offset) = seek(fromIndex)!;
     // Scan through the segments, searching for the lead byte. Each time that is found, delegate
     // to rangeEquals() to check for a complete match.
     final b0 = bytes[0];
     final bytesSize = bytes.length;
-    final resultLimit = _length - bytesSize + 1;
+    final resultLimit = toIndex - bytesSize + 1;
     while (offset < resultLimit) {
       // Scan through the current segment.
       final data = s.data;
       final segmentLimit = min(s.limit, s.pos + resultLimit - offset);
-      for (var pos = s.pos + start - offset; pos < segmentLimit; pos++) {
+      for (var pos = s.pos + fromIndex - offset; pos < segmentLimit; pos++) {
         if (data[pos] == b0 && s.rangeEquals(pos + 1, bytes, 1, bytesSize)) {
           return pos - s.pos + offset;
         }
@@ -113,7 +129,7 @@ class Buffer implements BufferedSource, BufferedSink {
 
       // Not in this segment. Try the next one.
       offset += s.limit - s.pos;
-      start = offset;
+      fromIndex = offset;
       s = s.next;
     }
     return -1;
@@ -158,6 +174,11 @@ class Buffer implements BufferedSource, BufferedSink {
 
   @override
   int readInt8() {
+    return readUint8().toSigned(8);
+  }
+
+  @override
+  int readUint8() {
     require(1);
 
     final segment = head!;
@@ -176,9 +197,6 @@ class Buffer implements BufferedSource, BufferedSink {
 
     return b;
   }
-
-  @override
-  int readUint8() => readInt8().toUnsigned(8);
 
   @override
   int readInt16([Endian endian = Endian.big]) {
@@ -626,6 +644,10 @@ class Buffer implements BufferedSource, BufferedSink {
 
   @override
   String toString() => asBytes().toString();
+
+  String toHexString() {
+    return asBytes().map((e) => e.toRadixString(16).padLeft(2, '0')).join();
+  }
 }
 
 class Segment {
@@ -762,7 +784,7 @@ class Segment {
   }
 
   @internal
-  bool rangeEquals(int pos, Uint8List bytes, [int start = 0, int? end]) {
+  bool rangeEquals(int pos, List<int> bytes, [int start = 0, int? end]) {
     end = RangeError.checkValidRange(start, end, bytes.length);
     var segment = this;
     var limit = this.limit;
@@ -776,15 +798,12 @@ class Segment {
         data = segment.data;
         pos = segment.pos;
       }
-
       if (data[pos] != bytes[i]) {
         return false;
       }
-
       pos++;
       i++;
     }
-
     return true;
   }
 

@@ -80,15 +80,15 @@ class ZipEntrySource with ForwardingSource {
     _verified = true;
     DataDescriptor? descriptor;
     if (header.useDataDescriptor) {
-      final sigOrCrc = await source.readUint32(Endian.little);
       final int crc, compressedSize, uncompressedSize;
       // According to zip specification, presence of extra data record header signature is optional.
       // If this signature is present, read it and read the next 4 bytes for crc
       // If signature not present, assign the read 4 bytes for crc
-      if (sigOrCrc == kExtsig) {
+      if (await source.startsWithBytes(kExtsig)) {
+        await source.skip(4);
         crc = await source.readUint32(Endian.little);
       } else {
-        crc = sigOrCrc;
+        crc = await source.readUint32(Endian.little);
       }
       if (header.isZip64Format) {
         compressedSize = await source.readUint64(Endian.little);

@@ -45,11 +45,11 @@ class LocalFileHeader extends AbstractFileHeader<LocalZip64ExtendedInfo> {
   }
 
   @override
-  int get signature => kLocsig;
+  List<int> get signature => kLocsig;
 
   @override
   Future<void> write(BufferedSink sink, Encoding? encoding) async {
-    await sink.writeUint32(signature, Endian.little);
+    await sink.writeFromBytes(signature);
     await sink.writeUint16(versionNeeded, Endian.little);
     await sink.writeFromBytes(generalPurposeFlag);
     final compressionMethod = aesExtraDataRecord == null

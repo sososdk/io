@@ -32,24 +32,24 @@ class ZipFile {
   static Future<ZipFile> create(
     File file,
     Iterable<FileEntry> entries, {
-    int diskSize = 64 * 1024,
+    int? diskSize,
     String? comment,
     Encoding? encoding,
     Uint8List? password,
   }) async {
-    assert(diskSize >= 1024);
+    assert(diskSize == null || diskSize >= 1024);
     _checkEntries(entries);
     final model = await ZipFileSink(file, diskSize).use((fileSink) async {
       final sink = fileSink.buffered();
-      await sink.writeUint32(kExtsig, Endian.little);
+      if (diskSize != null) await sink.writeFromBytes(kExtsig);
       await sink.emit();
-      final versionMadeBy = determineVersionMadeBy();
       final fileHeaders = <FileHeader>[];
+      final versionMadeBy = determineVersionMadeBy();
       for (final entry in entries) {
         final header = writeEntry(fileSink, entry, versionMadeBy, encoding);
         fileHeaders.add(await header);
       }
-      await fileSink.startFinalize();
+      if (diskSize != null) await fileSink.startFinalize();
       return finalize(fileSink, fileHeaders, versionMadeBy, encoding, comment);
     });
     return ZipFile(file, model: model);

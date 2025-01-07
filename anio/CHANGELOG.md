@@ -1,3 +1,9 @@
+## 2.0.5
+
+- Add `BufferedSource.startsWith` and `BufferedSource.startsWithBytes`.
+- Modify the parameter type of `BufferedSource.indexOfBytes` to `List<int>`. 
+- Fix bugs.
+
 ## 2.0.4
 
 - Fix bugs.

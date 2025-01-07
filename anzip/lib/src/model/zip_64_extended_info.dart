@@ -12,7 +12,7 @@ abstract class AbstractZip64ExtendedInfo implements ZipHeader {
   );
 
   @override
-  int get signature => kZip64extsig;
+  List<int> get signature => kZip64extsig;
 
   final int? compressedSize;
   final int? uncompressedSize;
@@ -33,7 +33,7 @@ class Zip64ExtendedInfo extends AbstractZip64ExtendedInfo {
 
   @override
   Future<void> write(BufferedSink buffer) async {
-    await buffer.writeUint16(signature, Endian.little);
+    await buffer.writeFromBytes(signature);
     final temp = Buffer();
     if (uncompressedSize != null) {
       temp.writeUint64(uncompressedSize!, Endian.little);
@@ -57,7 +57,7 @@ class LocalZip64ExtendedInfo extends AbstractZip64ExtendedInfo {
 
   @override
   Future<void> write(BufferedSink buffer) async {
-    await buffer.writeUint16(signature, Endian.little);
+    await buffer.writeFromBytes(signature);
     final temp = Buffer();
     if (uncompressedSize != null) {
       temp.writeUint64(uncompressedSize!, Endian.little);

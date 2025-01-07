@@ -20,7 +20,7 @@ class EndOfCentralDirectoryRecord implements ZipHeader {
   );
 
   @override
-  int get signature => kEndsig;
+  List<int> get signature => kEndsig;
 
   /// number of this disk
   final int numberOfDisk;
@@ -42,7 +42,7 @@ class EndOfCentralDirectoryRecord implements ZipHeader {
   final String? comment;
 
   Future<void> write(BufferedSink sink, Encoding? encoding) async {
-    await sink.writeUint32(signature, Endian.little);
+    await sink.writeFromBytes(signature);
     await sink.writeUint16(numberOfDisk, Endian.little);
     await sink.writeUint16(numberOfDiskStartOfCentralDirectory, Endian.little);
     await sink.writeUint16(

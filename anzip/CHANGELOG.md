@@ -1,3 +1,7 @@
+## 2.0.1
+
+- Optimize `ZipFile.create` method.
+
 ## 2.0.0
 
 - improve functions.

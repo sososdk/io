@@ -13,14 +13,14 @@ class DataDescriptor implements ZipHeader {
   );
 
   @override
-  int get signature => kExtsig;
+  List<int> get signature => kExtsig;
 
   final int crc;
   final int compressedSize;
   final int uncompressedSize;
 
   Future<void> write(BufferedSink sink, bool isZip64Format) async {
-    await sink.writeInt32(signature, Endian.little);
+    await sink.writeFromBytes(signature);
     await sink.writeInt32(crc, Endian.little);
     if (isZip64Format) {
       await sink.writeInt64(compressedSize, Endian.little);

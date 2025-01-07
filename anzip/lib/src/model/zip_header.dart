@@ -1,3 +1,3 @@
 abstract interface class ZipHeader {
-  int get signature;
+  List<int> get signature;
 }

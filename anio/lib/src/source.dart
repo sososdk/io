@@ -30,14 +30,18 @@ abstract interface class BufferedSource implements Source {
   /// source is exhausted before the requested bytes can be skipped.
   FutureOr<void> skip(int count);
 
-  /// Returns the index of [element] if it is found in the range of [start] inclusive to [end]
-  /// exclusive. If [element] isn't found, or if `start == end`, then -1 is returned.
-  ///
-  /// The scan terminates at either [end] or the end of the buffer, whichever comes first. The
-  /// maximum number of bytes scanned is `start - end`.
-  FutureOr<int> indexOf(int element, [int start = 0, int? end]);
+  FutureOr<bool> startsWith(int element, [int fromIndex = 0]);
 
-  /// Returns the index of the first match for [bytes] in the range of [start] inclusive to [end]
+  FutureOr<bool> startsWithBytes(List<int> bytes, [int fromIndex = 0]);
+
+  /// Returns the index of [element] if it is found in the range of [fromIndex] inclusive to [toIndex]
+  /// exclusive. If [element] isn't found, or if `fromIndex == toIndex`, then -1 is returned.
+  ///
+  /// The scan terminates at either [toIndex] or the end of the buffer, whichever comes first. The
+  /// maximum number of bytes scanned is `fromIndex - toIndex`.
+  FutureOr<int> indexOf(int element, [int fromIndex = 0, int? toIndex]);
+
+  /// Returns the index of the first match for [bytes] in the range of [fromIndex] inclusive to [toIndex]
   /// exclusive. This expands the buffer as necessary until [bytes] is found. This reads an unbounded number of
   /// bytes into the buffer. Returns -1 if the stream is exhausted before the requested bytes are
   /// found.
@@ -51,7 +55,8 @@ abstract interface class BufferedSource implements Source {
   /// expect(6,  buffer.indexOfBytes(MOVE));
   /// expect(40, buffer.indexOfBytes(MOVE, 12));
   /// ```
-  FutureOr<int> indexOfBytes(Uint8List bytes, [int start = 0, int? end]);
+  FutureOr<int> indexOfBytes(List<int> bytes,
+      [int fromIndex = 0, int? toIndex]);
 
   /// Removes all bytes from this and appends them to `sink`. Returns the total number of bytes
   /// written to `sink` which will be 0 if this is exhausted.
@@ -236,39 +241,51 @@ class RealBufferedSource implements BufferedSource {
   }
 
   @override
-  Future<int> indexOf(int element, [int start = 0, int? end]) async {
-    checkArgument(start >= 0 && (end == null || start < end));
+  Future<bool> startsWith(int element, [int fromIndex = 0]) async {
+    return await indexOf(element, fromIndex, fromIndex + 1) != -1;
+  }
+
+  @override
+  Future<bool> startsWithBytes(List<int> bytes, [int fromIndex = 0]) async {
+    return await indexOfBytes(bytes, fromIndex, fromIndex + bytes.length) != -1;
+  }
+
+  @override
+  Future<int> indexOf(int element, [int fromIndex = 0, int? toIndex]) async {
+    checkArgument(fromIndex >= 0 && (toIndex == null || fromIndex < toIndex));
     checkState(!_closed, 'closed');
-    while (end == null || start < end) {
-      final result = _buffer.indexOf(element, start, end);
+    while (toIndex == null || fromIndex < toIndex) {
+      final result = _buffer.indexOf(element, fromIndex, toIndex);
       if (result != -1) return result;
 
       // The byte wasn't in the buffer. Give up if we've already reached our target size or if the
       // underlying stream is exhausted.
       final lastBufferLength = _buffer.length;
-      if ((end != null && lastBufferLength >= end) ||
+      if ((toIndex != null && lastBufferLength >= toIndex) ||
           await _source.read(_buffer, Segment.size) == 0) {
         return -1;
       }
 
       // Continue the search from where we left off.
-      start = max(start, lastBufferLength);
+      fromIndex = max(fromIndex, lastBufferLength);
     }
     return -1;
   }
 
   @override
-  Future<int> indexOfBytes(Uint8List bytes, [int start = 0, int? end]) async {
+  Future<int> indexOfBytes(List<int> bytes,
+      [int fromIndex = 0, int? toIndex]) async {
     checkState(!_closed, 'closed');
     while (true) {
-      final result = _buffer.indexOfBytes(bytes, start, end);
+      final result = _buffer.indexOfBytes(bytes, fromIndex, toIndex);
       if (result != -1) return result;
 
-      final lastBufferSize = _buffer.length;
-      if (await _source.read(_buffer, Segment.size) == 0) return -1;
+      final lastBufferLength = _buffer.length;
+      if ((toIndex != null && lastBufferLength >= toIndex) ||
+          await _source.read(_buffer, Segment.size) == 0) return -1;
 
       // Keep searching, picking up from where we left off.
-      start = max(start, lastBufferSize - bytes.length + 1);
+      fromIndex = max(fromIndex, lastBufferLength - bytes.length + 1);
     }
   }
 

@@ -445,12 +445,12 @@ class ZeroBuffer extends Buffer {
   }
 
   @override
-  int indexOf(int element, [int start = 0, int? end]) {
+  int indexOf(int element, [int fromIndex = 0, int? toIndex]) {
     throw UnimplementedError();
   }
 
   @override
-  int indexOfBytes(Uint8List bytes, [int start = 0, int? end]) {
+  int indexOfBytes(List<int> bytes, [int fromIndex = 0, int? toIndex]) {
     throw UnimplementedError();
   }
 

@@ -19,11 +19,11 @@ class AesExtraDataRecord extends EncryptionAes implements ZipHeader {
   }
 
   @override
-  int get signature => kAesextdatarec;
+  List<int> get signature => kAesextdatarec;
 
   Future<void> write(
       BufferedSink sink, CompressionMethod compressionMethod) async {
-    await sink.writeUint16(signature, Endian.little);
+    await sink.writeFromBytes(signature);
     await sink.writeUint16(7, Endian.little);
     await sink.writeUint16(aesVersion.versionNumber, Endian.little);
     await sink.writeString(vendorID, cp437);

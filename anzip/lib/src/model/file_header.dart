@@ -32,7 +32,7 @@ class FileHeader extends AbstractFileHeader<Zip64ExtendedInfo> {
   );
 
   @override
-  int get signature => kCensig;
+  List<int> get signature => kCensig;
 
   final int versionMadeBy;
   final int _diskNumberStart;
@@ -85,7 +85,7 @@ class FileHeader extends AbstractFileHeader<Zip64ExtendedInfo> {
 
   @override
   Future<void> write(BufferedSink sink, Encoding? encoding) async {
-    await sink.writeUint32(signature, Endian.little);
+    await sink.writeFromBytes(signature);
     await sink.writeUint16(versionMadeBy, Endian.little);
     await sink.writeUint16(versionNeeded, Endian.little);
     await sink.writeFromBytes(generalPurposeFlag);

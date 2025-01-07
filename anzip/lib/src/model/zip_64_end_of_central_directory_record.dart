@@ -19,7 +19,7 @@ class Zip64EndOfCentralDirectoryRecord implements ZipHeader {
   );
 
   @override
-  int get signature => kZip64censig;
+  List<int> get signature => kZip64censig;
 
   final int versionMadeBy;
   final int versionNeeded;
@@ -32,7 +32,7 @@ class Zip64EndOfCentralDirectoryRecord implements ZipHeader {
   final List<int> extensibleDataSector;
 
   Future<void> write(BufferedSink sink) async {
-    await sink.writeUint32(signature, Endian.little);
+    await sink.writeFromBytes(signature);
     await sink.writeUint64(44 + extensibleDataSector.length, Endian.little);
     await sink.writeUint16(versionMadeBy, Endian.little);
     await sink.writeUint16(versionNeeded, Endian.little);

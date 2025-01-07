@@ -1,26 +1,26 @@
-/// Temporary spanning marker.
-const kTemspmaker = 0x30304b50; // See APPNOTE.TXT 8.5.4
+/// Temporary spanning marker. http://www.pkware.com/documents/casestudies/APPNOTE.TXT
+const kTemspmaker = [0x50, 0x4b, 0x30, 0x30]; // 0x30304b50 "PK\030\030"
 
 /// Local file (LOC) header signature.
-const kLocsig = 0x04034b50; // "PK\003\004"
+const kLocsig = [0x50, 0x4b, 0x03, 0x04]; // 0x04034b50 "PK\003\004"
 
 /// Extra local (EXT) header signature.
-const kExtsig = 0x08074b50; // "PK\007\008"
+const kExtsig = [0x50, 0x4b, 0x07, 0x08]; // 0x08074b50 "PK\007\008"
 
 /// Central directory (CEN) header signature.
-const kCensig = 0x02014b50; // "PK\001\002"
+const kCensig = [0x50, 0x4b, 0x01, 0x02]; // 0x02014b50 "PK\001\002"
 
 /// End of central directory (END) header signature.
-const kEndsig = 0x06054b50; // "PK\005\006"
+const kEndsig = [0x50, 0x4b, 0x05, 0x06]; // 0x06054b50 "PK\005\006"
 
 // ZIP64 end of central directory locator (END) header signature.
-const kZip64endsig = 0x07064b50;
+const kZip64endsig = [0x50, 0x4b, 0x06, 0x07]; // 0x07064b50;
 
 // ZIP64 central directory (CEN) header signature.
-const kZip64censig = 0x06064b50;
+const kZip64censig = [0x50, 0x4b, 0x06, 0x06]; // 0x06064b50;
 
 /// digital signature.
-const kDigsig = 0x05054b50;
+const kDigsig = [0x50, 0x4b, 0x06, 0x05]; // 0x05054b50;
 
 /// Local file (LOC) header size in bytes (including signature).
 const kLochdr = 30;
@@ -131,10 +131,10 @@ const kEndoff = 16;
 const kEndcom = 20;
 
 /// aes extra data record.
-const kAesextdatarec = 0x9901;
+const kAesextdatarec = [0x01, 0x99];
 
 /// zip64 extra field signature.
-const kZip64extsig = 0x0001;
+const kZip64extsig = [0x01, 0x00];
 
 /// zip64 size limit.
 const kZip64sizelimit = 0xffffffff;

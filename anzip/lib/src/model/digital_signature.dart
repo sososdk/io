@@ -7,7 +7,7 @@ class DigitalSignature implements ZipHeader {
   const DigitalSignature(this.signatureData);
 
   @override
-  int get signature => kDigsig;
+  List<int> get signature => kDigsig;
 
   final Uint8List signatureData;
 }

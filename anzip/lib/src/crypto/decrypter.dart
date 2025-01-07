@@ -16,8 +16,8 @@ class AesDecrypter with AesCipher implements Decrypter {
       Uint8List password) {
     final derivedKey = derivePasswordBasedKey(salt, password);
     final derivedPasswordVerifier = derivePasswordVerifier(derivedKey);
-    const equality = ListEquality();
-    if (!equality.equals(passwordVerifier, derivedPasswordVerifier)) {
+    if (!const ListEquality()
+        .equals(passwordVerifier, derivedPasswordVerifier)) {
       throw ZipException('password error');
     }
     engine = getEngine(derivedKey);

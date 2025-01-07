@@ -9,7 +9,7 @@ environment:
 dependencies:
   file: '>=7.0.0 <8.0.0'
   path: '>=1.8.0 <2.0.0'
-  anio: ^2.0.4
+  anio: ^2.0.5
 
 dev_dependencies:
   lints: ^5.0.0
