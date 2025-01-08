@@ -64,7 +64,7 @@ Stream<ExtraDataRecord> _readExtraDataRecords(
       if (record.data.length != 7) {
         throw ZipException('corrupt AES extra data records');
       }
-      final buffer = Buffer()..writeFromBytes(record.data);
+      final buffer = Buffer.fromBytes(record.data);
       final aesVersion =
           AesVersion.fromVersionNumber(buffer.readUint16(Endian.little));
       final vendorID = buffer.readString(count: 2, encoding: cp437);
@@ -270,7 +270,7 @@ class FileHeaderReader {
         Zip64ExtendedInfo? zip64ExtendedInfo;
         for (final record in extraDataRecords) {
           if (const ListEquality().equals(record.signature, kZip64extsig)) {
-            final buffer = Buffer()..writeFromBytes(record.data);
+            final buffer = Buffer.fromBytes(record.data);
             final $uncompressedSize =
                 buffer.request(8) && uncompressedSize == kZip64sizelimit
                     ? buffer.readUint64(Endian.little)
@@ -378,7 +378,7 @@ class LocalFileHeaderReader {
     LocalZip64ExtendedInfo? zip64ExtendedInfo;
     for (final record in extraDataRecords) {
       if (const ListEquality().equals(record.signature, kZip64extsig)) {
-        final buffer = Buffer()..writeFromBytes(record.data);
+        final buffer = Buffer.fromBytes(record.data);
         zip64ExtendedInfo = LocalZip64ExtendedInfo(
           buffer.readUint64(Endian.little),
           buffer.readUint64(Endian.little),

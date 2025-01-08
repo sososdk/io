@@ -31,21 +31,20 @@ void main() {
       expect('[]', Buffer().toString());
       expect(
         '[97, 13, 10, 98, 10, 99, 13, 100, 92, 101]',
-        (Buffer()..writeString('a\r\nb\nc\rd\\e')).toString(),
+        Buffer.fromString('a\r\nb\nc\rd\\e').toString(),
       );
       expect(
         '[84, 121, 114, 97, 110, 110, 111, 115, 97, 117, 114]',
-        (Buffer()..writeString('Tyrannosaur')).toString(),
+        Buffer.fromString('Tyrannosaur').toString(),
       );
       expect(
         '[116, 201, 153, 203, 136, 114, 97, 110, 201, 153, 203, 140, 115, 195, 180, 114]',
-        (Buffer()
-              ..writeFromBytes(hex.decode('74c999cb8872616ec999cb8c73c3b472')))
+        Buffer.fromBytes(hex.decode('74c999cb8872616ec999cb8c73c3b472'))
             .toString(),
       );
       expect(
         '[${List.filled(64, '0').join(', ')}]',
-        (Buffer()..writeFromBytes(Int8List(64))).toString(),
+        Buffer.fromBytes(Int8List(64)).toString(),
       );
     });
 
@@ -149,7 +148,7 @@ void main() {
     });
 
     test('as bytes', () {
-      final buffer = Buffer()..writeString('hello, world!');
+      final buffer = Buffer.fromString('hello, world!');
       final out = buffer.asBytes();
       final outString = utf8.decode(out);
       expect('hello, world!', outString);
@@ -171,7 +170,7 @@ void main() {
     });
 
     test('read into sink', () {
-      final buffer = Buffer()..writeString('hello, world!');
+      final buffer = Buffer.fromString('hello, world!');
       final out = Buffer();
       buffer.readIntoSink(out);
       final outString = out.readString();
@@ -311,8 +310,8 @@ void main() {
     });
 
     test('equals and hash code', () {
-      final a = Buffer()..writeString('dog');
-      final b = Buffer()..writeString('hotdog');
+      final a = Buffer.fromString('dog');
+      final b = Buffer.fromString('hotdog');
       expect(a, isNot(equals(b)));
       expect(a.hashCode, isNot(equals(b.hashCode)));
       b.readString(count: 3); // Leaves b containing 'dog'.
@@ -351,7 +350,7 @@ void main() {
     });
 
     test('write all multiple segments', () async {
-      final source = Buffer()..writeString('a' * (kSegmentSize * 3));
+      final source = Buffer.fromString('a' * (kSegmentSize * 3));
       final sink = Buffer();
       expect((kSegmentSize * 3), await sink.writeFromSource(source));
       expect(0, source.length);
@@ -409,14 +408,14 @@ void main() {
 
     test('copy to empty source', () {
       final source = Buffer();
-      final target = Buffer()..writeString('aaa');
+      final target = Buffer.fromString('aaa');
       source.copyTo(target, 0, 0);
       expect('', source.readString());
       expect('aaa', target.readString());
     });
 
     test('copy to empty target', () {
-      final source = Buffer()..writeString('aaa');
+      final source = Buffer.fromString('aaa');
       final target = Buffer();
       source.copyTo(target, 0, 3);
       expect('aaa', source.readString());
@@ -424,7 +423,7 @@ void main() {
     });
 
     test('copy to reports accurate size', () {
-      final buf = Buffer()..writeFromBytes([0, 1, 2, 3]);
+      final buf = Buffer.fromBytes([0, 1, 2, 3]);
       final buffer = Buffer();
       buf.copyTo(buffer, 0, 1);
       expect(4, buf.length);
@@ -502,7 +501,7 @@ void main() {
     });
 
     test('index of bytes with from index', () {
-      final source = Buffer()..writeString('aaa');
+      final source = Buffer.fromString('aaa');
       expect(0, source.indexOfBytes('a'.codeUnits));
       expect(0, source.indexOfBytes('a'.codeUnits, 0));
       expect(1, source.indexOfBytes('a'.codeUnits, 1));
@@ -639,15 +638,15 @@ void main() {
     test('file handle sink position', () async {
       await system.file('temp').openHandle(mode: FileMode.write).use((e) async {
         await e.sink().use((sink) async {
-          await sink.write(Buffer()..writeString('abcde'), 5);
+          await sink.write(Buffer.fromString('abcde'), 5);
           expect(5, e.positionSink(sink));
-          await sink.write(Buffer()..writeString('fghijklmno'), 10);
+          await sink.write(Buffer.fromString('fghijklmno'), 10);
           expect(15, e.positionSink(sink));
         });
         await e.sink(200).use((sink) async {
-          await sink.write(Buffer()..writeString('abcde'), 5);
+          await sink.write(Buffer.fromString('abcde'), 5);
           expect(205, e.positionSink(sink));
-          await sink.write(Buffer()..writeString('fghijklmno'), 10);
+          await sink.write(Buffer.fromString('fghijklmno'), 10);
           expect(215, e.positionSink(sink));
         });
         await e.source().buffered().use((sink) async {
@@ -661,15 +660,15 @@ void main() {
     test('file handle buffered sink position', () async {
       await system.file('temp').openHandle(mode: FileMode.write).use((e) async {
         await e.sink().buffered().use((sink) async {
-          await sink.write(Buffer()..writeString('abcde'), 5);
+          await sink.write(Buffer.fromString('abcde'), 5);
           expect(5, e.positionSink(sink));
-          await sink.write(Buffer()..writeString('fghijklmno'), 10);
+          await sink.write(Buffer.fromString('fghijklmno'), 10);
           expect(15, e.positionSink(sink));
         });
         await e.sink(200).buffered().use((sink) async {
-          await sink.write(Buffer()..writeString('abcde'), 5);
+          await sink.write(Buffer.fromString('abcde'), 5);
           expect(205, e.positionSink(sink));
-          await sink.write(Buffer()..writeString('fghijklmno'), 10);
+          await sink.write(Buffer.fromString('fghijklmno'), 10);
           expect(215, e.positionSink(sink));
         });
         await e.source().buffered().use((sink) async {
@@ -683,17 +682,17 @@ void main() {
     test('file handle sink reposition', () async {
       await system.file('temp').openHandle(mode: FileMode.write).use((e) async {
         await e.sink().use((sink) async {
-          await sink.write(Buffer()..writeString('abcdefghij'), 10);
+          await sink.write(Buffer.fromString('abcdefghij'), 10);
           await e.repositionSink(sink, 5);
           expect(5, e.positionSink(sink));
-          await sink.write(Buffer()..writeString('KLM'), 3);
+          await sink.write(Buffer.fromString('KLM'), 3);
           expect(8, e.positionSink(sink));
 
           await e.repositionSink(sink, 200);
-          await sink.write(Buffer()..writeString('ABCDEFGHIJ'), 10);
+          await sink.write(Buffer.fromString('ABCDEFGHIJ'), 10);
           await e.repositionSink(sink, 205);
           expect(205, e.positionSink(sink));
-          await sink.write(Buffer()..writeString('klm'), 3);
+          await sink.write(Buffer.fromString('klm'), 3);
           expect(208, e.positionSink(sink));
         });
 
@@ -714,17 +713,17 @@ void main() {
     test('file handle buffered sink reposition', () async {
       await system.file('temp').openHandle(mode: FileMode.write).use((e) async {
         await e.sink().buffered().use((sink) async {
-          await sink.write(Buffer()..writeString('abcdefghij'), 10);
+          await sink.write(Buffer.fromString('abcdefghij'), 10);
           await e.repositionSink(sink, 5);
           expect(5, e.positionSink(sink));
-          await sink.write(Buffer()..writeString('KLM'), 3);
+          await sink.write(Buffer.fromString('KLM'), 3);
           expect(8, e.positionSink(sink));
 
           await e.repositionSink(sink, 200);
-          await sink.write(Buffer()..writeString('ABCDEFGHIJ'), 10);
+          await sink.write(Buffer.fromString('ABCDEFGHIJ'), 10);
           await e.repositionSink(sink, 205);
           expect(205, e.positionSink(sink));
-          await sink.write(Buffer()..writeString('klm'), 3);
+          await sink.write(Buffer.fromString('klm'), 3);
           expect(208, e.positionSink(sink));
         });
 
@@ -995,7 +994,7 @@ void main() {
 
   group('peek', () {
     test('peek', () async {
-      final buffer = Buffer()..writeString('abcdefghi');
+      final buffer = Buffer.fromString('abcdefghi');
       expect('abc', buffer.readString(count: 3));
       final peek = buffer.peek();
       expect('def', await peek.readString(count: 3));
@@ -1005,7 +1004,7 @@ void main() {
     });
 
     test('peek multiple', () async {
-      final buffer = Buffer()..writeString('abcdefghi');
+      final buffer = Buffer.fromString('abcdefghi');
       expect('abc', buffer.readString(count: 3));
       final peek1 = buffer.peek();
       final peek2 = buffer.peek();
@@ -1019,7 +1018,7 @@ void main() {
     });
 
     test('peek large', () async {
-      final buffer = Buffer()..writeString('abcdef');
+      final buffer = Buffer.fromString('abcdef');
       buffer.writeString('g' * 2 * kSegmentSize);
       buffer.writeString('hij');
       expect('abc', buffer.readString(count: 3));
@@ -1034,7 +1033,7 @@ void main() {
     });
 
     test('peek invalid', () async {
-      final buffer = Buffer()..writeString('abcdefghi');
+      final buffer = Buffer.fromString('abcdefghi');
       expect('abc', buffer.readString(count: 3));
       final peek = buffer.peek();
       expect('def', await peek.readString(count: 3));
@@ -1051,7 +1050,7 @@ void main() {
     });
 
     test('peek segment then invalid', () async {
-      final buffer = Buffer()..writeString('abc');
+      final buffer = Buffer.fromString('abc');
       buffer.writeString('d' * 2 * kSegmentSize);
       expect('abc', buffer.readString(count: 3));
 
@@ -1073,7 +1072,7 @@ void main() {
 
     test('peek doesnt read too much', () async {
       // 6 bytes in source's buffer plus 3 bytes upstream.
-      final buffer = Buffer()..writeString('abcdef');
+      final buffer = Buffer.fromString('abcdef');
       buffer.require(6);
       buffer.writeString('ghi');
       final peek = buffer.peek();
@@ -1099,7 +1098,7 @@ Future<List<int>> moveBytesBetweenBuffers(List<String> contents) async {
   final expected = StringBuffer();
   final buffer = Buffer();
   for (var s in contents) {
-    final source = Buffer()..writeString(s);
+    final source = Buffer.fromString(s);
     await buffer.writeFromSource(source);
     expected.write(s);
   }

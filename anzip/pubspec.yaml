@@ -1,6 +1,6 @@
 name: anzip
 description: A dart library for zip files / streams.
-version: 2.0.1
+version: 2.0.2
 repository: https://github.com/sososdk/io/anzip
 
 environment:
@@ -13,7 +13,7 @@ dependencies:
   convert: '>=3.1.1 <4.0.0'
   collection: '>=1.18.0 <2.0.0'
   pointycastle: '>=3.7.4 <4.0.0'
-  anio: ^2.0.5
+  anio: ^2.0.6
   file_system: ^2.0.4
   synchronizer: ^1.0.2
 

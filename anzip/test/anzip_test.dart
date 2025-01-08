@@ -75,7 +75,7 @@ void main() {
 
           FileEntry entry2() {
             return createEntry(
-              Buffer()..writeFromBytes(Uint8List(4)),
+              Buffer.fromBytes(Uint8List(4)),
               name: entry2Name,
               comment: entry2Comment,
               modifyTime: entry2Time,
@@ -222,7 +222,7 @@ void main() {
     test('force zip 64', () async {
       final zipFile = ZipFile(generatedFile);
       await zipFile.add([
-        FileEntry(Buffer()..writeFromBytes(Uint8List(4)),
+        FileEntry(Buffer.fromBytes(Uint8List(4)),
             name: entryName, forceZip64Format: true),
       ]);
       await checkZipFile(zipFile, false, true, null);
@@ -248,8 +248,7 @@ void main() {
     test('large file', () async {
       final zipFile = ZipFile(generatedFile);
       await zipFile.add([
-        FileEntry(Buffer()..writeFromBytes(Uint8List(0xffffffff + 1)),
-            name: entryName),
+        FileEntry(Buffer.fromBytes(Uint8List(0xffffffff + 1)), name: entryName),
       ]);
       await checkZipFile(zipFile, false, true, null);
       final header = zipFile.fileHeaders.first;
@@ -276,7 +275,7 @@ void main() {
           zipFile.add([
             FileEntry(
               ZeroBuffer(0xffffffff),
-              // Buffer()..writeFromBytes(Uint8List(0xffffffff)),
+              // Buffer.fromBytes(Uint8List(0xffffffff)),
               name: entryName,
               password: Uint8List.fromList('password'.codeUnits),
               encryptionMethod: const EncryptionZipCrypto(),

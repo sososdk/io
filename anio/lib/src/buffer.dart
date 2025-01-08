@@ -2,6 +2,16 @@ part of 'anio.dart';
 
 /// A collection of bytes in memory.
 class Buffer implements BufferedSource, BufferedSink {
+  Buffer();
+
+  factory Buffer.fromBytes(List<int> bytes, [int start = 0, int? end]) {
+    return Buffer()..writeFromBytes(bytes, start, end);
+  }
+
+  factory Buffer.fromString(String string, [Encoding encoding = utf8]) {
+    return Buffer()..writeString(string, encoding);
+  }
+
   @internal
   Segment? head;
 
