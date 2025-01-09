@@ -173,7 +173,7 @@ abstract interface class BufferedSource implements Source {
   ///
   /// buffer.readString(3) // returns "def", buffer contains "ghi"
   /// ```
-  FutureOr<BufferedSource> peek();
+  BufferedSource peek();
 }
 
 class RealBufferedSource implements BufferedSource {
@@ -434,7 +434,7 @@ class RealBufferedSource implements BufferedSource {
   }
 
   @override
-  FutureOr<BufferedSource> peek() => PeekSource(this).buffered();
+  BufferedSource peek() => PeekSource(this).buffered();
 
   @override
   Future<bool> rangeEquals(int offset, List<int> bytes,

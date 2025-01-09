@@ -1,7 +1,11 @@
 ## 2.0.6
 
+- Optimize .
+
+## 2.0.6
+
 - Add constructors for `Buffer`.
- 
+
 ## 2.0.5
 
 - Add `BufferedSource.startsWith` and `BufferedSource.startsWithBytes`.
