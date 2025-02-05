@@ -1,8 +1,281 @@
 part of 'anio.dart';
 
-extension RandomAccessFileExtension on RandomAccessFile {
-  Future<int> readIntoSink(Buffer sink, int count) async {
-    checkArgument(count >= 0, 'count < 0: $count');
+abstract mixin class AsyncDispatcher {
+  @protected
+  var asyncDispatched = false;
+  @protected
+  var closed = false;
+
+  @protected
+  Future<T> dispatch<T>(Future<T> Function() f, {bool close = false}) async {
+    if (closed) return Future.error(closedMessage());
+    if (asyncDispatched) return Future.error(dispatchedMessage());
+    if (close) closed = true;
+    asyncDispatched = true;
+    return f().whenComplete(() => asyncDispatched = false);
+  }
+
+  @protected
+  void checkAvailable() {
+    if (asyncDispatched) throw dispatchedMessage();
+    if (closed) throw closedMessage();
+  }
+
+  @protected
+  Object closedMessage() => StateError('closed');
+
+  @protected
+  Object dispatchedMessage() {
+    return StateError('An async operation is currently pending');
+  }
+}
+
+abstract interface class FileHandle implements RandomAccessFile {
+  factory FileHandle(RandomAccessFile delegate) = _FileHandleImpl;
+
+  @visibleForTesting
+  int get openCount;
+
+  @override
+  Future<FileHandle> flush();
+
+  @override
+  Future<FileHandle> lock(
+      [FileLock mode = FileLock.exclusive, int start = 0, int end = -1]);
+
+  @override
+  Future<FileHandle> unlock([int start = 0, int end = -1]);
+
+  @override
+  Future<FileHandle> setPosition(int position);
+
+  @override
+  Future<FileHandle> truncate(int length);
+
+  @override
+  Future<FileHandle> writeByte(int value);
+
+  @override
+  Future<FileHandle> writeFrom(List<int> buffer, [int start = 0, int? end]);
+
+  @override
+  Future<FileHandle> writeString(String string, {Encoding encoding = utf8});
+
+  Future<int> readIntoSink(Buffer sink, int count);
+
+  Future<int> readIntoSinkWithPosition(int position, Buffer sink, int count);
+
+  int readIntoSinkSync(Buffer sink, int count);
+
+  int readIntoSinkWithPositionSync(int position, Buffer sink, int count);
+
+  Future<FileHandle> writeFromSource(Buffer source, int count);
+
+  void writeFromSourceSync(Buffer source, int count);
+
+  Future<FileHandle> writeFromSourceWithPosition(
+      int position, Buffer source, int count);
+
+  void writeFromSourceWithPositionSync(int position, Buffer source, int count);
+
+  FileSource source([int position = 0]);
+
+  FileSink sink([int position = 0]);
+}
+
+mixin FileHandleBase implements FileHandle {
+  @protected
+  RandomAccessFile get delegate;
+
+  @override
+  @visibleForTesting
+  var openCount = 0;
+
+  @protected
+  var asyncDispatched = false;
+
+  @protected
+  Future<T> dispatch<T>(Future<T> Function() f, {bool close = false}) async {
+    if (openCount < 0) return Future.error(closedMessage());
+    if (asyncDispatched) return Future.error(dispatchedMessage());
+    if (close) openCount--;
+    asyncDispatched = true;
+    return f().whenComplete(() => asyncDispatched = false);
+  }
+
+  @protected
+  void checkAvailable() {
+    if (asyncDispatched) throw dispatchedMessage();
+    if (openCount < 0) throw closedMessage();
+  }
+
+  @protected
+  Object closedMessage() {
+    return FileSystemException('File closed', path);
+  }
+
+  @protected
+  Object dispatchedMessage() {
+    return FileSystemException('An async operation is currently pending', path);
+  }
+
+  @override
+  Future<FileHandle> flush() => dispatch(() async {
+        await delegate.flush();
+        return this;
+      });
+
+  @override
+  void flushSync() {
+    checkAvailable();
+    return delegate.flushSync();
+  }
+
+  @override
+  Future<int> length() => dispatch(delegate.length);
+
+  @override
+  int lengthSync() {
+    checkAvailable();
+    return delegate.lengthSync();
+  }
+
+  @override
+  Future<FileHandle> lock(
+      [FileLock mode = FileLock.exclusive, int start = 0, int end = -1]) {
+    return dispatch(() async {
+      await delegate.lock(mode, start, end);
+      return this;
+    });
+  }
+
+  @override
+  void lockSync(
+      [FileLock mode = FileLock.exclusive, int start = 0, int end = -1]) {
+    checkAvailable();
+    return delegate.lockSync(mode, start, end);
+  }
+
+  @override
+  Future<FileHandle> unlock([int start = 0, int end = -1]) {
+    return dispatch(() async {
+      await delegate.unlock(start, end);
+      return this;
+    });
+  }
+
+  @override
+  void unlockSync([int start = 0, int end = -1]) {
+    checkAvailable();
+    return delegate.unlockSync(start, end);
+  }
+
+  @override
+  String get path => delegate.path;
+
+  @override
+  Future<int> position() => dispatch(delegate.position);
+
+  @override
+  int positionSync() {
+    checkAvailable();
+    return delegate.positionSync();
+  }
+
+  @override
+  Future<Uint8List> read(int count) => dispatch(() => delegate.read(count));
+
+  @override
+  Uint8List readSync(int count) {
+    checkAvailable();
+    return delegate.readSync(count);
+  }
+
+  @override
+  Future<int> readByte() => dispatch(delegate.readByte);
+
+  @override
+  int readByteSync() {
+    checkAvailable();
+    return delegate.readByteSync();
+  }
+
+  @override
+  Future<int> readInto(List<int> buffer, [int start = 0, int? end]) {
+    return dispatch(() => delegate.readInto(buffer, start, end));
+  }
+
+  @override
+  int readIntoSync(List<int> buffer, [int start = 0, int? end]) {
+    checkAvailable();
+    return delegate.readIntoSync(buffer, start, end);
+  }
+
+  @override
+  Future<FileHandle> setPosition(int position) => dispatch(() async {
+        await delegate.setPosition(position);
+        return this;
+      });
+
+  @override
+  void setPositionSync(int position) {
+    checkAvailable();
+    return delegate.setPositionSync(position);
+  }
+
+  @override
+  Future<FileHandle> truncate(int length) => dispatch(() async {
+        await delegate.truncate(length);
+        return this;
+      });
+
+  @override
+  void truncateSync(int length) {
+    checkAvailable();
+    return delegate.truncateSync(length);
+  }
+
+  @override
+  Future<FileHandle> writeByte(int value) => dispatch(() async {
+        await delegate.writeByte(value);
+        return this;
+      });
+
+  @override
+  int writeByteSync(int value) {
+    checkAvailable();
+    return delegate.writeByteSync(value);
+  }
+
+  @override
+  Future<FileHandle> writeFrom(List<int> buffer, [int start = 0, int? end]) {
+    return dispatch(() async {
+      await delegate.writeFrom(buffer, start, end);
+      return this;
+    });
+  }
+
+  @override
+  void writeFromSync(List<int> buffer, [int start = 0, int? end]) {
+    checkAvailable();
+    return delegate.writeFromSync(buffer, start, end);
+  }
+
+  @override
+  Future<FileHandle> writeString(String string, {Encoding encoding = utf8}) {
+    return dispatch(() async {
+      await delegate.writeString(string, encoding: encoding);
+      return this;
+    });
+  }
+
+  @override
+  void writeStringSync(String string, {Encoding encoding = utf8}) {
+    checkAvailable();
+    return delegate.writeStringSync(string, encoding: encoding);
+  }
+
+  Future<int> _readIntoSink(Buffer sink, int count) async {
     var bytesRead = 0;
     while (count > bytesRead) {
       final tail = sink.writableSegment(1);
@@ -10,7 +283,7 @@ extension RandomAccessFileExtension on RandomAccessFile {
       final bytes = tail.data;
       final start = tail.limit;
       final end = tail.limit + length;
-      final readResult = await readInto(bytes, start, end);
+      final readResult = await delegate.readInto(bytes, start, end);
       if (readResult == 0) {
         if (tail.pos == tail.limit) {
           // We allocated a tail segment, but didn't end up needing it. Recycle!
@@ -25,13 +298,63 @@ extension RandomAccessFileExtension on RandomAccessFile {
     return bytesRead;
   }
 
-  Future<void> writeFromSource(Buffer source, int count) async {
-    RangeError.checkValueInInterval(count, 0, source.length);
+  @override
+  Future<int> readIntoSink(Buffer sink, int count) {
+    checkArgument(count >= 0, 'count < 0: $count');
+    return dispatch(() => _readIntoSink(sink, count));
+  }
+
+  @override
+  Future<int> readIntoSinkWithPosition(int position, Buffer sink, int count) {
+    checkArgument(count >= 0, 'count < 0: $count');
+    return dispatch(() =>
+        delegate.setPosition(position).then((e) => _readIntoSink(sink, count)));
+  }
+
+  int _readIntoSinkSync(Buffer sink, int count) {
+    var bytesRead = 0;
+    while (count > bytesRead) {
+      final tail = sink.writableSegment(1);
+      final length = min(count - bytesRead, Segment.size - tail.limit);
+      final bytes = tail.data;
+      final start = tail.limit;
+      final end = tail.limit + length;
+      final readResult = delegate.readIntoSync(bytes, start, end);
+      if (readResult == 0) {
+        if (tail.pos == tail.limit) {
+          // We allocated a tail segment, but didn't end up needing it. Recycle!
+          sink.head = tail.pop();
+        }
+        break;
+      }
+      tail.limit += readResult;
+      bytesRead += readResult;
+      sink.length += readResult;
+    }
+    return bytesRead;
+  }
+
+  @override
+  int readIntoSinkSync(Buffer sink, int count) {
+    checkAvailable();
+    checkArgument(count >= 0, 'count < 0: $count');
+    return _readIntoSinkSync(sink, count);
+  }
+
+  @override
+  int readIntoSinkWithPositionSync(int position, Buffer sink, int count) {
+    checkAvailable();
+    checkArgument(count >= 0, 'count < 0: $count');
+    setPositionSync(position);
+    return _readIntoSinkSync(sink, count);
+  }
+
+  Future<void> _writeFromSource(Buffer source, int count) async {
     while (count > 0) {
       final head = source.head!;
       final toCopy = min(count, head.limit - head.pos);
       final end = head.pos + toCopy;
-      await writeFrom(head.data, head.pos, end);
+      await delegate.writeFrom(head.data, head.pos, end);
       head.pos += toCopy;
       count -= toCopy;
       source.length -= toCopy;
@@ -41,322 +364,254 @@ extension RandomAccessFileExtension on RandomAccessFile {
     }
   }
 
-  Source source() => FileSource(this);
+  @override
+  Future<FileHandle> writeFromSource(Buffer source, int count) {
+    RangeError.checkValueInInterval(count, 0, source.length);
+    return dispatch(() async {
+      await _writeFromSource(source, count);
+      return this;
+    });
+  }
 
-  Sink sink() => FileSink(this);
+  @override
+  Future<FileHandle> writeFromSourceWithPosition(
+      int position, Buffer source, int count) {
+    RangeError.checkValueInInterval(count, 0, source.length);
+    return dispatch(() => delegate.setPosition(position).then((e) async {
+          await _writeFromSource(source, count);
+          return this;
+        }));
+  }
+
+  void _writeFromSourceSync(Buffer source, int count) {
+    while (count > 0) {
+      final head = source.head!;
+      final toCopy = min(count, head.limit - head.pos);
+      final end = head.pos + toCopy;
+      delegate.writeFromSync(head.data, head.pos, end);
+      head.pos += toCopy;
+      count -= toCopy;
+      source.length -= toCopy;
+      if (head.pos == head.limit) {
+        source.head = head.pop();
+      }
+    }
+  }
+
+  @override
+  void writeFromSourceSync(Buffer source, int count) {
+    checkAvailable();
+    RangeError.checkValueInInterval(count, 0, source.length);
+    _writeFromSourceSync(source, count);
+  }
+
+  @override
+  void writeFromSourceWithPositionSync(int position, Buffer source, int count) {
+    checkAvailable();
+    RangeError.checkValueInInterval(count, 0, source.length);
+    delegate.setPositionSync(position);
+    _writeFromSourceSync(source, count);
+  }
+
+  @override
+  FileSource source([int position = 0]) {
+    checkAvailable();
+    openCount++;
+    return FileSource(this, position);
+  }
+
+  @override
+  FileSink sink([int position = 0]) {
+    checkAvailable();
+    openCount++;
+    return FileSink(this, position);
+  }
+
+  @override
+  Future<void> close() async {
+    return dispatch(() async {
+      if (openCount < 0) await delegate.close();
+    }, close: true);
+  }
+
+  @override
+  void closeSync() {
+    checkAvailable();
+    openCount--;
+    if (openCount < 0) delegate.closeSync();
+  }
 }
 
-extension FutureRandomAccessFileExtension on Future<RandomAccessFile> {
-  Future<FileHandle> handle() => then((e) => e.handle());
+class _FileHandleImpl with FileHandleBase {
+  @override
+  final RandomAccessFile delegate;
 
-  Future<Source> source() async => FileSource(await this);
-
-  Future<Sink> sink() async => FileSink(await this);
+  _FileHandleImpl(this.delegate);
 }
 
-@internal
-class FileSource implements Source {
-  final RandomAccessFile randomAccessFile;
-
-  const FileSource(this.randomAccessFile);
-
-  @override
-  Future<int> read(Buffer sink, int count) {
-    return randomAccessFile.readIntoSink(sink, count);
-  }
-
-  @override
-  Future<void> close() {
-    return randomAccessFile.close();
-  }
-}
-
-class FileSink implements Sink {
-  final RandomAccessFile randomAccessFile;
-
-  const FileSink(this.randomAccessFile);
-
-  @override
-  Future<void> write(Buffer source, int count) {
-    return randomAccessFile.writeFromSource(source, count);
-  }
-
-  @override
-  Future<void> flush() {
-    return randomAccessFile.flush();
-  }
-
-  @override
-  Future<void> close() {
-    return randomAccessFile.close();
-  }
+extension FileHandleRandomAccessFileExtension on RandomAccessFile {
+  FileHandle handle() => FileHandle(this);
 }
 
 extension FileHandleFileExtension on File {
   Future<FileHandle> openHandle({FileMode mode = FileMode.read}) async {
-    return FileHandle._(await open(mode: mode));
+    return open(mode: mode).then((e) => e.handle());
   }
 
   FileHandle openHandleSync({FileMode mode = FileMode.read}) {
-    return FileHandle._(openSync(mode: mode));
+    return openSync(mode: mode).handle();
   }
-}
-
-extension FileHandleRandomAccessFileExtension on RandomAccessFile {
-  FileHandle handle() => FileHandle._(this);
 }
 
 extension FutureFileHandleExtension on Future<FileHandle> {
-  Future<Sink> sink([int position = 0]) => then((e) => e.sink(position));
+  Future<FileSource> source([int position = 0]) {
+    return then((e) => e.source(position));
+  }
 
-  Future<Source> source([int position = 0]) => then((e) => e.source(position));
+  Future<FileSink> sink([int position = 0]) => then((e) => e.sink(position));
 }
 
 extension NullableFutureFileHandleExtension on Future<FileHandle?> {
-  Future<Sink?> sink([int position = 0]) => then((e) => e?.sink(position));
-
-  Future<Source?> source([int position = 0]) {
+  Future<FileSource?> source([int position = 0]) {
     return then((e) => e?.source(position));
   }
+
+  Future<FileSink?> sink([int position = 0]) => then((e) => e?.sink(position));
 }
 
-class FileHandle {
-  FileHandle._(this.randomAccessFile);
+class FileSource with AsyncDispatcher implements Source {
+  FileSource(this.handle, int position) : _position = position;
 
-  final RandomAccessFile randomAccessFile;
+  final FileHandle handle;
 
-  final _lock = Lock();
+  int _position;
 
-  var _closed = false;
-  var _openCount = 0;
-
-  Source source([int position = 0]) {
-    checkState(!_closed, 'closed');
-    _openCount++;
-    return FileHandleSource(this, position);
+  int get position {
+    checkAvailable();
+    return _position;
   }
 
-  Sink sink([int position = 0]) {
-    checkState(!_closed, 'closed');
-    _openCount++;
-    return FileHandleSink(this, position);
+  set position(int value) {
+    checkAvailable();
+    _position = value;
   }
 
-  Future<Sink> appendingSink() async {
-    checkState(!_closed, 'closed');
-    _openCount++;
-    return FileHandleSink(this, await length());
+  @override
+  Future<int> read(Buffer sink, int count) => dispatch(() async {
+        final n = await handle.readIntoSinkWithPosition(_position, sink, count);
+        _position += n;
+        return n;
+      });
+
+  @override
+  Future<void> close() {
+    return dispatch(handle.close, close: true);
+  }
+}
+
+class FileSink with AsyncDispatcher implements Sink {
+  FileSink(this.handle, int position) : _position = position;
+
+  final FileHandle handle;
+
+  int _position;
+
+  int get position {
+    checkAvailable();
+    return _position;
   }
 
-  int positionSource(Source source) {
+  set position(int value) {
+    checkAvailable();
+    _position = value;
+  }
+
+  @override
+  Future<void> write(Buffer source, int count) {
+    return dispatch(() async {
+      await handle.writeFromSourceWithPosition(_position, source, count);
+      _position += count;
+    });
+  }
+
+  @override
+  Future<void> flush() {
+    return dispatch(handle.flush);
+  }
+
+  @override
+  Future<void> close() async {
+    return dispatch(handle.close, close: true);
+  }
+}
+
+extension BufferedFileSourceExtension on BufferedSource {
+  int get position {
+    Source source = this;
     var bufferSize = 0;
-
-    if (source is RealBufferedSource) {
-      bufferSize = source.buffer.length;
+    while (source is RealBufferedSource) {
+      bufferSize += source.buffer.length;
       source = source.source;
     }
-
-    checkArgument(
-      source is FileHandleSource && identical(source.fileHandle, this),
-      'source was not created by this FileHandle',
-    );
-    source = source as FileHandleSource;
-    checkState(!source._closed, 'closed');
-
-    return source._position - bufferSize;
+    checkArgument(source is FileSource, 'source was not a $FileSource');
+    source = source as FileSource;
+    return source.position - bufferSize;
   }
 
-  /// Change the position of [source] in the file to [position]. The argument [source] must be either
-  /// a source produced by this file handle, or a [BufferedSource] that directly wraps such a source.
-  /// If the parameter is a [BufferedSource], it will skip or clear buffered bytes.
-  Future<void> repositionSource(Source source, int position) async {
-    if (source is RealBufferedSource) {
-      var fileHandleSource = source.source;
-      checkArgument(
-        fileHandleSource is FileHandleSource &&
-            identical(fileHandleSource.fileHandle, this),
-        'source was not created by this FileHandle',
-      );
-      fileHandleSource = fileHandleSource as FileHandleSource;
-      checkState(!fileHandleSource._closed, 'closed');
-
-      final bufferSize = source.buffer.length;
-      final toSkip = position - (fileHandleSource._position - bufferSize);
-      if (0 <= toSkip && toSkip < bufferSize) {
-        // The new position requires only a buffer change.
-        source.buffer.skip(toSkip);
-      } else {
-        // The new position doesn't share data with the current buffer.
-        source.buffer.clear();
-        fileHandleSource._position = position;
+  set position(int value) {
+    Source source = this;
+    var bufferSize = 0;
+    while (source is RealBufferedSource) {
+      bufferSize += source.buffer.length;
+      source = source.source;
+    }
+    checkArgument(source is FileSource, 'source was not a $FileSource');
+    source = source as FileSource;
+    var toSkip = value - (source.position - bufferSize);
+    if (0 <= toSkip && toSkip < bufferSize) {
+      // The new position requires only a buffer change.
+      Source temp = this;
+      while (toSkip > 0 && temp is RealBufferedSource) {
+        final count = min(toSkip, temp.buffer.length);
+        temp.buffer.skip(count);
+        toSkip -= count;
+        temp = temp.source;
       }
     } else {
-      checkArgument(
-        source is FileHandleSource && identical(source.fileHandle, this),
-        'source was not created by this FileHandle',
-      );
-      source = source as FileHandleSource;
-      checkState(!source._closed, 'closed');
-      source._position = position;
+      // The new position doesn't share data with the current buffer.
+      Source temp = this;
+      while (temp is RealBufferedSource) {
+        temp.buffer.clear();
+        temp = temp.source;
+      }
+      source.position = value;
     }
   }
+}
 
-  int positionSink(Sink sink) {
+extension BufferedFileSinkExtension on BufferedSink {
+  int get position {
+    Sink sink = this;
     var bufferSize = 0;
-
-    if (sink is RealBufferedSink) {
-      bufferSize = sink.buffer.length;
+    while (sink is RealBufferedSink) {
+      bufferSize += sink.buffer.length;
       sink = sink.sink;
     }
-
-    checkArgument(
-      sink is FileHandleSink && identical(sink.fileHandle, this),
-      'sink was not created by this FileHandle',
-    );
-    sink = sink as FileHandleSink;
-    checkState(!sink._closed, 'closed');
-
-    return sink._position + bufferSize;
+    checkArgument(sink is FileSink, 'sink was not a $FileSink');
+    sink = sink as FileSink;
+    return sink.position + bufferSize;
   }
 
-  /// Change the position of [sink] in the file to [position]. The argument [sink] must be either a
-  /// sink produced by this file handle, or a [BufferedSink] that directly wraps such a sink. If the
-  /// parameter is a [BufferedSink], it emits for buffered bytes.
-  Future<void> repositionSink(Sink sink, int position) async {
-    if (sink is RealBufferedSink) {
-      var fileHandleSink = sink.sink;
-      checkArgument(
-        fileHandleSink is FileHandleSink &&
-            identical(fileHandleSink.fileHandle, this),
-        'sink was not created by this FileHandle',
-      );
-      fileHandleSink = fileHandleSink as FileHandleSink;
-      checkState(!fileHandleSink._closed, 'closed');
-
-      await sink.emit();
-      fileHandleSink._position = position;
-    } else {
-      checkArgument(sink is FileHandleSink && identical(sink.fileHandle, this),
-          'sink was not created by this FileHandle');
-      sink = sink as FileHandleSink;
-      checkState(!sink._closed, 'closed');
-      sink._position = position;
+  set position(int value) {
+    Sink sink = this;
+    var bufferSize = 0;
+    while (sink is RealBufferedSink) {
+      bufferSize += sink.buffer.length;
+      sink = sink.sink;
     }
-  }
-
-  Future<int> read(int position, Buffer sink, int count) async {
-    checkState(!_closed, 'closed');
-    return readInto(position, sink, count);
-  }
-
-  Future<void> write(int position, Buffer source, int count) {
-    checkState(!_closed, 'closed');
-    return writeFrom(position, source, count);
-  }
-
-  @internal
-  Future<int> readInto(int position, Buffer sink, int count) {
-    return _lock.synchronized(() async {
-      await randomAccessFile.setPosition(position);
-      return randomAccessFile.readIntoSink(sink, count);
-    });
-  }
-
-  @internal
-  Future<void> writeFrom(int position, Buffer source, int count) {
-    return _lock.synchronized(() async {
-      await randomAccessFile.setPosition(position);
-      await randomAccessFile.writeFromSource(source, count);
-    });
-  }
-
-  Future<int> position() {
-    checkState(!_closed, 'closed');
-    return _lock.synchronized(() => randomAccessFile.position());
-  }
-
-  Future<void> truncate(int length) {
-    checkState(!_closed, 'closed');
-    return _lock.synchronized(() => randomAccessFile.truncate(length));
-  }
-
-  Future<int> length() {
-    checkState(!_closed, 'closed');
-    return _lock.synchronized(() => randomAccessFile.length());
-  }
-
-  Future<void> flush() {
-    checkState(!_closed, 'closed');
-    return _lock.synchronized(() => randomAccessFile.flush());
-  }
-
-  Future<void> close() async {
-    if (_closed) return;
-    _closed = true;
-    if (_openCount != 0) return;
-    return _lock.synchronized(() => randomAccessFile.close());
-  }
-
-  Future<void> _closeOpened() async {
-    _openCount--;
-    if (_openCount != 0 || !_closed) return;
-    return _lock.synchronized(() => randomAccessFile.close());
-  }
-}
-
-@internal
-class FileHandleSource implements Source {
-  FileHandleSource(this.fileHandle, int position) : _position = position;
-
-  final FileHandle fileHandle;
-
-  int _position;
-
-  var _closed = false;
-
-  @override
-  Future<int> read(Buffer sink, int count) async {
-    checkState(!_closed, 'closed');
-    final result = await fileHandle.readInto(_position, sink, count);
-    _position += result;
-    return result;
-  }
-
-  @override
-  Future<void> close() async {
-    if (_closed) return;
-    _closed = true;
-    return fileHandle._closeOpened();
-  }
-}
-
-@internal
-class FileHandleSink implements Sink {
-  FileHandleSink(this.fileHandle, int position) : _position = position;
-
-  final FileHandle fileHandle;
-
-  int _position;
-
-  var _closed = false;
-
-  @override
-  Future<void> write(Buffer source, int count) async {
-    checkState(!_closed, 'closed');
-    await fileHandle.writeFrom(_position, source, count);
-    _position += count;
-  }
-
-  @override
-  Future<void> flush() {
-    checkState(!_closed, 'closed');
-    return fileHandle.flush();
-  }
-
-  @override
-  Future<void> close() async {
-    if (_closed) return;
-    _closed = true;
-    return fileHandle._closeOpened();
+    checkArgument(sink is FileSink, 'sink was not a $FileSink');
+    if (bufferSize > 0) throw StateError('buffer not emitted');
+    sink = sink as FileSink;
+    sink.position = value;
   }
 }

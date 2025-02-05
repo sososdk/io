@@ -12,7 +12,7 @@ abstract interface class Sink {
   FutureOr<void> close();
 }
 
-abstract interface class BufferedSink implements Sink {
+sealed class BufferedSink implements Sink {
   Buffer get buffer;
 
   /// Removes all bytes from `source` and appends them to this sink. Returns the number of bytes read

@@ -1,10 +1,12 @@
-import 'package:file_system/file_system.dart';
+import 'dart:io';
 
-class IndexRandomAccessFile with ForwardingRandomAccessFile {
+import 'package:anio/anio.dart';
+
+class IndexFileHandle with FileHandleBase {
   final int index;
 
   @override
   final RandomAccessFile delegate;
 
-  IndexRandomAccessFile(this.index, this.delegate);
+  IndexFileHandle(this.index, this.delegate);
 }

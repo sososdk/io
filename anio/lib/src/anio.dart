@@ -7,7 +7,6 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
-import 'package:synchronizer/synchronizer.dart';
 
 part 'buffer.dart';
 part 'io.dart';
@@ -49,12 +48,10 @@ extension ClosableExtension<T extends dynamic> on T {
   }
 
   FutureOr<void> _close([FutureOr<void> Function()? close]) async {
-    try {
-      final function = close ?? this?.close;
-      if (function == null) return;
-      final result = function();
-      if (result is Future) await result;
-    } catch (_) {}
+    final function = close ?? this?.close;
+    if (function == null) return;
+    final result = function();
+    if (result is Future) await result;
   }
 }
 

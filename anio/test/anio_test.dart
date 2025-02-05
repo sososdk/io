@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:anio/src/anio.dart';
+import 'package:anio/anio.dart';
 import 'package:convert/convert.dart';
 import 'package:file/file.dart';
 import 'package:file/memory.dart';
@@ -639,15 +639,15 @@ void main() {
       await system.file('temp').openHandle(mode: FileMode.write).use((e) async {
         await e.sink().use((sink) async {
           await sink.write(Buffer.fromString('abcde'), 5);
-          expect(5, e.positionSink(sink));
+          expect(5, sink.position);
           await sink.write(Buffer.fromString('fghijklmno'), 10);
-          expect(15, e.positionSink(sink));
+          expect(15, sink.position);
         });
         await e.sink(200).use((sink) async {
           await sink.write(Buffer.fromString('abcde'), 5);
-          expect(205, e.positionSink(sink));
+          expect(205, sink.position);
           await sink.write(Buffer.fromString('fghijklmno'), 10);
-          expect(215, e.positionSink(sink));
+          expect(215, sink.position);
         });
         await e.source().buffered().use((sink) async {
           expect('abcdefghijklmno', await sink.readString(count: 15));
@@ -661,15 +661,15 @@ void main() {
       await system.file('temp').openHandle(mode: FileMode.write).use((e) async {
         await e.sink().buffered().use((sink) async {
           await sink.write(Buffer.fromString('abcde'), 5);
-          expect(5, e.positionSink(sink));
+          expect(5, sink.position);
           await sink.write(Buffer.fromString('fghijklmno'), 10);
-          expect(15, e.positionSink(sink));
+          expect(15, sink.position);
         });
         await e.sink(200).buffered().use((sink) async {
           await sink.write(Buffer.fromString('abcde'), 5);
-          expect(205, e.positionSink(sink));
+          expect(205, sink.position);
           await sink.write(Buffer.fromString('fghijklmno'), 10);
-          expect(215, e.positionSink(sink));
+          expect(215, sink.position);
         });
         await e.source().buffered().use((sink) async {
           expect('abcdefghijklmno', await sink.readString(count: 15));
@@ -683,28 +683,28 @@ void main() {
       await system.file('temp').openHandle(mode: FileMode.write).use((e) async {
         await e.sink().use((sink) async {
           await sink.write(Buffer.fromString('abcdefghij'), 10);
-          await e.repositionSink(sink, 5);
-          expect(5, e.positionSink(sink));
+          sink.position = 5;
+          expect(5, sink.position);
           await sink.write(Buffer.fromString('KLM'), 3);
-          expect(8, e.positionSink(sink));
+          expect(8, sink.position);
 
-          await e.repositionSink(sink, 200);
+          sink.position = 200;
           await sink.write(Buffer.fromString('ABCDEFGHIJ'), 10);
-          await e.repositionSink(sink, 205);
-          expect(205, e.positionSink(sink));
+          sink.position = 205;
+          expect(205, sink.position);
           await sink.write(Buffer.fromString('klm'), 3);
-          expect(208, e.positionSink(sink));
+          expect(208, sink.position);
         });
 
         {
           final buffer = Buffer();
-          await e.read(0, buffer, 10);
+          await e.readIntoSinkWithPosition(0, buffer, 10);
           expect('abcdeKLMij', buffer.readString());
         }
 
         {
           final buffer = Buffer();
-          await e.read(200, buffer, 15);
+          await e.readIntoSinkWithPosition(200, buffer, 15);
           expect('ABCDEklmIJ', buffer.readString());
         }
       });
@@ -714,28 +714,31 @@ void main() {
       await system.file('temp').openHandle(mode: FileMode.write).use((e) async {
         await e.sink().buffered().use((sink) async {
           await sink.write(Buffer.fromString('abcdefghij'), 10);
-          await e.repositionSink(sink, 5);
-          expect(5, e.positionSink(sink));
+          await sink.emit();
+          sink.position = 5;
+          expect(5, sink.position);
           await sink.write(Buffer.fromString('KLM'), 3);
-          expect(8, e.positionSink(sink));
+          expect(8, sink.position);
 
-          await e.repositionSink(sink, 200);
+          await sink.emit();
+          sink.position = 200;
           await sink.write(Buffer.fromString('ABCDEFGHIJ'), 10);
-          await e.repositionSink(sink, 205);
-          expect(205, e.positionSink(sink));
+          await sink.emit();
+          sink.position = 205;
+          expect(205, sink.position);
           await sink.write(Buffer.fromString('klm'), 3);
-          expect(208, e.positionSink(sink));
+          expect(208, sink.position);
         });
 
         {
           final buffer = Buffer();
-          await e.read(0, buffer, 10);
+          await e.readIntoSinkWithPosition(0, buffer, 10);
           expect('abcdeKLMij', buffer.readString());
         }
 
         {
           final buffer = Buffer();
-          await e.read(200, buffer, 15);
+          await e.readIntoSinkWithPosition(200, buffer, 15);
           expect('ABCDEklmIJ', buffer.readString());
         }
       });
@@ -752,24 +755,24 @@ void main() {
         final buffer = Buffer();
 
         await e.source().use((source) async {
-          expect(0, e.positionSource(source));
+          expect(0, source.position);
           expect(4, await source.read(buffer, 4));
           expect('abcd', buffer.readString());
-          expect(4, e.positionSource(source));
+          expect(4, source.position);
         });
 
         await e.source(8).use((source) async {
-          expect(8, e.positionSource(source));
+          expect(8, source.position);
           expect(4, await source.read(buffer, 4));
           expect('ijkl', buffer.readString());
-          expect(12, e.positionSource(source));
+          expect(12, source.position);
         });
 
         await e.source(16).use((source) async {
-          expect(16, e.positionSource(source));
+          expect(16, source.position);
           expect(0, await source.read(buffer, 4));
           expect('', buffer.readString());
-          expect(16, e.positionSource(source));
+          expect(16, source.position);
         });
       });
     });
@@ -785,31 +788,31 @@ void main() {
         final buffer = Buffer();
 
         await e.source().use((source) async {
-          await e.repositionSource(source, 12);
-          expect(12, e.positionSource(source));
+          source.position = 12;
+          expect(12, source.position);
           expect(4, await source.read(buffer, 4));
           expect('mnop', buffer.readString());
           expect(0, await source.read(buffer, 4));
           expect('', buffer.readString());
-          expect(16, e.positionSource(source));
+          expect(16, source.position);
 
-          await e.repositionSource(source, 0);
-          expect(0, e.positionSource(source));
+          source.position = 0;
+          expect(0, source.position);
           expect(4, await source.read(buffer, 4));
           expect('abcd', buffer.readString());
-          expect(4, e.positionSource(source));
+          expect(4, source.position);
 
-          await e.repositionSource(source, 8);
-          expect(8, e.positionSource(source));
+          source.position = 8;
+          expect(8, source.position);
           expect(4, await source.read(buffer, 4));
           expect('ijkl', buffer.readString());
-          expect(12, e.positionSource(source));
+          expect(12, source.position);
 
-          await e.repositionSource(source, 16);
-          expect(16, e.positionSource(source));
+          source.position = 16;
+          expect(16, source.position);
           expect(0, await source.read(buffer, 4));
           expect('', buffer.readString());
-          expect(16, e.positionSource(source));
+          expect(16, source.position);
         });
       });
     });
@@ -824,40 +827,40 @@ void main() {
         expect(16, await e.length());
         final buffer = Buffer();
 
-        await e.source().buffered().use((source) async {
+        await e.source().buffered().buffered().buffered().use((source) async {
           expect(0, source.buffer.length);
-          await e.repositionSource(source, 12);
-          expect(12, e.positionSource(source));
+          source.position = 12;
+          expect(12, source.position);
           expect(4, await source.read(buffer, 4));
           expect(0, source.buffer.length);
           expect('mnop', buffer.readString());
           expect(0, await source.read(buffer, 4));
           expect('', buffer.readString());
-          expect(16, e.positionSource(source));
+          expect(16, source.position);
 
-          await e.repositionSource(source, 0);
+          source.position = 0;
           expect(0, source.buffer.length);
-          expect(0, e.positionSource(source));
+          expect(0, source.position);
           expect(4, await source.read(buffer, 4));
           expect(12, source.buffer.length);
           expect('abcd', buffer.readString());
-          expect(4, e.positionSource(source));
+          expect(4, source.position);
 
-          await e.repositionSource(source, 8);
+          source.position = 8;
           expect(8, source.buffer.length);
-          expect(8, e.positionSource(source));
+          expect(8, source.position);
           expect(4, await source.read(buffer, 4));
           expect(4, source.buffer.length);
           expect('ijkl', buffer.readString());
-          expect(12, e.positionSource(source));
+          expect(12, source.position);
 
-          await e.repositionSource(source, 16);
+          source.position = 16;
           expect(0, source.buffer.length);
-          expect(16, e.positionSource(source));
+          expect(16, source.position);
           expect(0, await source.read(buffer, 4));
           expect(0, source.buffer.length);
           expect('', buffer.readString());
-          expect(16, e.positionSource(source));
+          expect(16, source.position);
         });
       });
     });
@@ -873,16 +876,16 @@ void main() {
 
         final buffer = Buffer();
         await e.source().use((source) async {
-          expect(0, e.positionSource(source));
+          expect(0, source.position);
           expect(16, await source.read(buffer, 16));
           expect('abcdefghijklmnop', buffer.readString());
-          expect(16, e.positionSource(source));
+          expect(16, source.position);
         });
         await e.source(0).use((source) async {
-          expect(0, e.positionSource(source));
+          expect(0, source.position);
           expect(16, await source.read(buffer, 16));
           expect('abcdefghijklmnop', buffer.readString());
-          expect(16, e.positionSource(source));
+          expect(16, source.position);
         });
       });
     });
@@ -898,22 +901,22 @@ void main() {
 
         final buffer = Buffer();
         await e.source().buffered().use((source) async {
-          expect(0, e.positionSource(source));
+          expect(0, source.position);
           expect(4, await source.read(buffer, 4));
           expect('abcd', buffer.readString());
-          expect(4, e.positionSource(source));
+          expect(4, source.position);
         });
         await e.source(8).buffered().use((source) async {
-          expect(8, e.positionSource(source));
+          expect(8, source.position);
           expect(4, await source.read(buffer, 4));
           expect('ijkl', buffer.readString());
-          expect(12, e.positionSource(source));
+          expect(12, source.position);
         });
         await e.source(16).buffered().use((source) async {
-          expect(16, e.positionSource(source));
+          expect(16, source.position);
           expect(0, await source.read(buffer, 4));
           expect('', buffer.readString());
-          expect(16, e.positionSource(source));
+          expect(16, source.position);
         });
       });
     });
@@ -929,16 +932,16 @@ void main() {
 
         final buffer = Buffer();
         await e.source().buffered().use((source) async {
-          expect(0, e.positionSource(source));
+          expect(0, source.position);
           expect(16, await source.read(buffer, 16));
           expect('abcdefghijklmnop', buffer.readString());
-          expect(16, e.positionSource(source));
+          expect(16, source.position);
         });
         await e.source(0).buffered().use((source) async {
-          expect(0, e.positionSource(source));
+          expect(0, source.position);
           expect(16, await source.read(buffer, 16));
           expect('abcdefghijklmnop', buffer.readString());
-          expect(16, e.positionSource(source));
+          expect(16, source.position);
         });
       });
     });
@@ -947,9 +950,9 @@ void main() {
       await system.file('temp').openHandle(mode: FileMode.write).use((e) async {
         final sink = e.sink();
         await sink.close();
-        expect(() => e.positionSink(sink), throwsA(isA<StateError>()));
+        expect(() => sink.position, throwsA(isA<StateError>()));
         expect(
-          () => e.positionSink(sink.buffered()),
+          () => sink.buffered().buffered().buffered().position,
           throwsA(isA<StateError>()),
         );
       });
@@ -959,9 +962,9 @@ void main() {
       await system.file('temp').openHandle(mode: FileMode.write).use((e) async {
         final sink = e.sink();
         await sink.close();
-        expect(() => e.repositionSink(sink, 1), throwsA(isA<StateError>()));
+        expect(() => sink.position = 1, throwsA(isA<StateError>()));
         expect(
-          () => e.repositionSink(sink.buffered(), 1),
+          () => sink.buffered().buffered().buffered().position = 1,
           throwsA(isA<StateError>()),
         );
       });
@@ -971,9 +974,9 @@ void main() {
       await system.file('temp').openHandle(mode: FileMode.write).use((e) async {
         final source = e.source();
         await source.close();
-        expect(() => e.positionSource(source), throwsA(isA<StateError>()));
+        expect(() => source.position, throwsA(isA<StateError>()));
         expect(
-          () => e.positionSource(source.buffered()),
+          () => source.buffered().buffered().buffered().position,
           throwsA(isA<StateError>()),
         );
       });
@@ -983,9 +986,9 @@ void main() {
       await system.file('temp').openHandle(mode: FileMode.write).use((e) async {
         final source = e.source();
         await source.close();
-        expect(() => e.repositionSource(source, 1), throwsA(isA<StateError>()));
+        expect(() => source.position = 1, throwsA(isA<StateError>()));
         expect(
-          () => e.repositionSource(source.buffered(), 1),
+          () => source.buffered().buffered().buffered().position = 1,
           throwsA(isA<StateError>()),
         );
       });

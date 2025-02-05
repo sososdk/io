@@ -1,6 +1,6 @@
-## 2.0.6
+## 2.0.8
 
-- Optimize .
+- Optimize `FileHandle`, `FileSource` and `FileSink`.
 
 ## 2.0.6
 

@@ -10,34 +10,55 @@ import '../split_file_naming.dart';
 
 class ZipFileSink implements Sink {
   ZipFileSink(File file, [int? diskSize])
-      : _raf = _ZipRandomAccessFile(file, diskSize);
+      : _handle = _ZipFileHandle(_ZipRandomAccessFile(file, diskSize));
 
-  final _ZipRandomAccessFile _raf;
+  final _ZipFileHandle _handle;
 
   @override
   Future<void> write(Buffer source, int count) async {
-    await _raf.writeFromSource(source, count);
+    await _handle.writeFromSource(source, count);
   }
 
   Future<void> update(int index, int position, Buffer source, int count) {
-    return _raf.update(index, position, source, count);
+    return _handle.update(index, position, source, count);
   }
 
-  int index() => _raf.index();
+  int index() => _handle.index();
 
-  Future<int> position() => _raf.position();
+  Future<int> position() => _handle.position();
 
-  Future<void> setPosition(int position) => _raf.setPosition(position);
+  Future<void> setPosition(int position) => _handle.setPosition(position);
 
-  Future<void> truncate(int length) => _raf.truncate(length);
+  Future<void> truncate(int length) => _handle.truncate(length);
 
-  Future<void> startFinalize() => _raf.finalize();
-
-  @override
-  Future<void> flush() => _raf.flush();
+  Future<void> startFinalize() => _handle.finalize();
 
   @override
-  Future<void> close() => _raf.close();
+  Future<void> flush() => _handle.flush();
+
+  @override
+  Future<void> close() => _handle.close();
+}
+
+class _ZipFileHandle with FileHandleBase {
+  @override
+  final _ZipRandomAccessFile delegate;
+
+  _ZipFileHandle(this.delegate);
+
+  int index() => delegate.index();
+
+  Future<void> update(int index, int position, Buffer source, int count) {
+    return delegate.update(index, position, source, count);
+  }
+
+  Future<void> finalize() => delegate.finalize();
+
+  @override
+  FileSink sink([int position = 0]) {
+    // TODO: implement sink
+    return super.sink(position);
+  }
 }
 
 class _ZipRandomAccessFile with ForwardingRandomAccessFile {
@@ -48,7 +69,7 @@ class _ZipRandomAccessFile with ForwardingRandomAccessFile {
   _ZipRandomAccessFile(this.file, this.diskSize)
       : naming = SplitFileNaming(p.basenameWithoutExtension(file.path));
 
-  IndexRandomAccessFile? __raf;
+  IndexFileHandle? __handle;
   var _finalize = false;
 
   Future<void> finalize() async {
@@ -59,20 +80,20 @@ class _ZipRandomAccessFile with ForwardingRandomAccessFile {
   @override
   RandomAccessFile get delegate => throw UnimplementedError();
 
-  Future<IndexRandomAccessFile> _raf() async {
-    if (__raf == null) {
+  Future<IndexFileHandle> _handle() async {
+    if (__handle == null) {
       final raf = await file.open(mode: FileMode.append);
-      __raf = IndexRandomAccessFile(0, raf);
+      __handle = IndexFileHandle(0, raf);
     }
-    return __raf!;
+    return __handle!;
   }
 
-  Future<IndexRandomAccessFile> _nextSink() async {
-    final index = __raf!.index + 1;
-    await __raf!.close();
+  Future<IndexFileHandle> _nextSink() async {
+    final index = __handle!.index + 1;
+    await __handle!.close();
     await file.rename(file.parent.childFile(naming.indexName(index)).path);
     final raf = await file.open(mode: FileMode.write);
-    return __raf = IndexRandomAccessFile(index, raf);
+    return __handle = IndexFileHandle(index, raf);
   }
 
   @override
@@ -83,10 +104,10 @@ class _ZipRandomAccessFile with ForwardingRandomAccessFile {
   ]) async {
     end = RangeError.checkValidRange(start, end, buffer.length);
     if (diskSize == null || _finalize) {
-      final raf = await _raf();
+      final raf = await _handle();
       await raf.writeFrom(buffer, start, end);
     } else {
-      var raf = await _raf();
+      var raf = await _handle();
       while (end - start > 0) {
         if (diskSize! <= await raf.length()) {
           raf = await _nextSink();
@@ -102,7 +123,7 @@ class _ZipRandomAccessFile with ForwardingRandomAccessFile {
 
   Future<void> update(int index, int position, Buffer source, int count) async {
     RangeError.checkValueInInterval(count, 0, source.length);
-    var raf = await _raf();
+    var raf = await _handle();
     final currentIndex = raf.index;
     final currentPosition = await raf.position();
     if (currentIndex == index) {
@@ -116,22 +137,22 @@ class _ZipRandomAccessFile with ForwardingRandomAccessFile {
             .childFile(naming.indexName(index + 1))
             .open(mode: FileMode.append)
             .then((e) => e.setPosition(position));
-        raf = IndexRandomAccessFile(index, delegate);
+        raf = IndexFileHandle(index, delegate);
         while (count > 0) {
           if (await raf.length() <= await raf.position()) {
             await raf.close();
             final index = raf.index + 1;
             if (index == currentIndex) {
-              await __raf!.setPosition(0);
-              await __raf!.writeFromSource(source, count);
-              await __raf!.setPosition(currentPosition);
+              await __handle!.setPosition(0);
+              await __handle!.writeFromSource(source, count);
+              await __handle!.setPosition(currentPosition);
               return;
             } else {
               final delegate = await file.parent
                   .childFile(naming.indexName(index + 1))
                   .open(mode: FileMode.append)
                   .then((e) => e.setPosition(0));
-              raf = IndexRandomAccessFile(index, delegate);
+              raf = IndexFileHandle(index, delegate);
             }
           }
           final size = min(await raf.length() - await raf.position(), count);
@@ -144,27 +165,27 @@ class _ZipRandomAccessFile with ForwardingRandomAccessFile {
     }
   }
 
-  int index() => __raf?.index ?? 0;
+  int index() => __handle?.index ?? 0;
 
   @override
-  Future<int> position() => _raf().then((e) => e.position());
+  Future<int> position() => _handle().then((e) => e.position());
 
   @override
   Future<RandomAccessFile> setPosition(int position) {
-    return _raf().then((e) => e.setPosition(position));
+    return _handle().then((e) => e.setPosition(position));
   }
 
   @override
   Future<RandomAccessFile> truncate(int length) async {
-    return _raf().then((e) => e.truncate(length));
+    return _handle().then((e) => e.truncate(length));
   }
 
   @override
   Future<RandomAccessFile> flush() async {
-    await __raf?.flush();
+    await __handle?.flush();
     return this;
   }
 
   @override
-  Future<void> close() async => __raf?.close();
+  Future<void> close() async => __handle?.close();
 }

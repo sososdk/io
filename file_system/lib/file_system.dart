@@ -95,15 +95,6 @@ extension FileSystemShortcuts on FileSystem {
     });
   }
 
-  Future<Sink> openAppendingSink(
-    dynamic path, {
-    bool recursive = false,
-  }) {
-    return open(path, mode: FileMode.write, recursive: recursive).use((handle) {
-      return handle.appendingSink();
-    });
-  }
-
   Future<Source> openSource(dynamic path, {int position = 0}) {
     return open(path, mode: FileMode.read, recursive: false).use((handle) {
       return handle.source(position);

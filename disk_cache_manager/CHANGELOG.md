@@ -1,3 +1,7 @@
+## 1.0.11
+
+- update dependencies.
+
 ## 1.0.10
 
 - update dependencies.

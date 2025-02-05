@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:anio/anio.dart';
 import 'package:file_system/file_system.dart';
 import 'package:path/path.dart' as p;
-import 'package:synchronizer/synchronizer.dart';
 
 import '../../model/file_header.dart';
 import '../index_random_access_file.dart';
@@ -20,69 +19,82 @@ class ZipFileHandle {
       : assert(diskNumber >= 0),
         naming = SplitFileNaming(p.basenameWithoutExtension(file.path));
 
-  final _lock = Lock();
+  IndexFileHandle? __handle;
 
-  IndexRandomAccessFile? __raf;
-
-  var _closed = false;
   var _openCount = 0;
+  var _asyncDispatched = false;
+
+  Future<T> _dispatch<T>(Future<T> Function() f, {bool close = false}) async {
+    if (_openCount < 0) return Future.error(_closedMessage());
+    if (_asyncDispatched) return Future.error(_dispatchedMessage());
+    if (close) _openCount--;
+    _asyncDispatched = true;
+    return f().whenComplete(() => _asyncDispatched = false);
+  }
+
+  void _checkAvailable() {
+    if (_asyncDispatched) throw _dispatchedMessage();
+    if (_openCount < 0) throw _closedMessage();
+  }
+
+  Object _closedMessage() {
+    return FileSystemException('File closed', file.path);
+  }
+
+  Object _dispatchedMessage() {
+    return FileSystemException(
+        'An async operation is currently pending', file.path);
+  }
+
+  Future<IndexFileHandle> _handle([int index = 0]) async {
+    if (__handle == null || __handle!.index != index) {
+      await __handle?.close();
+      if (index == diskNumber) {
+        __handle = IndexFileHandle(index, await file.open());
+      } else {
+        final temp = file.parent.childFile(naming.indexName(index + 1));
+        __handle = IndexFileHandle(index, await temp.open());
+      }
+    }
+    return __handle!;
+  }
+
+  Future<(int, int, int)> readInto(
+      int index, int position, Buffer sink, int count) {
+    return _dispatch(() async {
+      var handle = await _handle(index);
+      await handle.setPosition(position);
+
+      var bytesRead = 0;
+      while (bytesRead < count) {
+        final readResult = await handle.readIntoSink(sink, count - bytesRead);
+        if (readResult == 0) {
+          final index = handle.index + 1;
+          if (index > diskNumber) break;
+
+          handle = await _handle(index);
+        } else {
+          bytesRead += readResult;
+        }
+      }
+      return (handle.index, await handle.position(), bytesRead);
+    });
+  }
 
   Source entrySource(FileHeader header) {
     return source(header.diskNumberStart, header.offsetLocalHeader);
   }
 
   Source source([int index = 0, int position = 0]) {
-    if (_closed) throw StateError('closed');
+    _checkAvailable();
     _openCount++;
     return ZipFileHandleSource(this, index, position);
   }
 
-  Future<IndexRandomAccessFile> _raf([int index = 0]) async {
-    if (__raf == null || __raf!.index != index) {
-      await __raf?.close();
-      if (index == diskNumber) {
-        __raf = IndexRandomAccessFile(index, await file.open());
-      } else {
-        final temp = file.parent.childFile(naming.indexName(index + 1));
-        __raf = IndexRandomAccessFile(index, await temp.open());
-      }
-    }
-    return __raf!;
-  }
-
-  Future<(int, int, int)> readInto(
-      int index, int position, Buffer sink, int count) {
-    return _lock.synchronized(() async {
-      var raf = await _raf(index);
-      await raf.setPosition(position);
-
-      var bytesRead = 0;
-      while (bytesRead < count) {
-        final readResult = await raf.readIntoSink(sink, count - bytesRead);
-        if (readResult == 0) {
-          final index = raf.index + 1;
-          if (index > diskNumber) break;
-
-          raf = await _raf(index);
-        } else {
-          bytesRead += readResult;
-        }
-      }
-      return (raf.index, await raf.position(), bytesRead);
-    });
-  }
-
   Future<void> close() async {
-    if (_closed) return;
-    _closed = true;
-    if (_openCount != 0) return;
-    return _lock.synchronized(() => __raf?.close());
-  }
-
-  Future<void> _closeOpened() async {
-    _openCount--;
-    if (_openCount != 0 || !_closed) return;
-    return _lock.synchronized(() => __raf?.close());
+    return _dispatch(() async {
+      if (_openCount < 0) await __handle?.close();
+    }, close: true);
   }
 }
 
@@ -110,6 +122,6 @@ class ZipFileHandleSource implements Source {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
-    return fileHandle._closeOpened();
+    return fileHandle.close();
   }
 }

@@ -312,7 +312,7 @@ class Buffer implements BufferedSource, BufferedSink {
 
   @override
   void write(Buffer source, int count) {
-    checkArgument(source != this, 'source == this');
+    checkArgument(!identical(source, this), 'source == this');
     RangeError.checkValueInInterval(count, 0, source._length);
     while (count > 0) {
       // Is a prefix of the source's head segment all that we need to move?

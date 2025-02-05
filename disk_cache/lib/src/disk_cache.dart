@@ -4,7 +4,7 @@ import 'package:anio/anio.dart';
 import 'package:file_system/file_system.dart';
 import 'package:meta/meta.dart';
 import 'package:path/path.dart';
-import 'package:synchronizer/synchronizer.dart';
+import 'package:synchronized/synchronized.dart';
 
 import 'logger.dart';
 import 'lru_map.dart';
@@ -191,7 +191,7 @@ class DiskCache {
           _mostRecentRebuildFailed = true;
           _journalWriter = BlackHoleSink().buffered();
         }
-      }, checkReentrant: false);
+      });
 
   Future<void> initialize() => _lock.synchronized(() => _initialize());
 

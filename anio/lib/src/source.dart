@@ -11,7 +11,7 @@ abstract interface class Source {
   FutureOr<void> close();
 }
 
-abstract interface class BufferedSource implements Source {
+sealed class BufferedSource implements Source {
   /// This source's internal buffer.
   Buffer get buffer;
 
