@@ -88,6 +88,7 @@ mixin FileHandleBase implements FileHandle {
   RandomAccessFile get delegate;
 
   @override
+  @protected
   @visibleForTesting
   var openCount = 0;
 

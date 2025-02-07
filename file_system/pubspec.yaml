@@ -1,6 +1,6 @@
 name: file_system
 description: A generic file system abstraction for Dart.
-version: 2.0.7
+version: 2.0.8
 homepage: https://github.com/sososdk/io/tree/master/file_system
 
 environment:
@@ -9,7 +9,7 @@ environment:
 dependencies:
   file: '>=7.0.0 <8.0.0'
   path: '>=1.8.0 <2.0.0'
-  anio: ^2.0.8
+  anio: ^2.0.9
 
 dev_dependencies:
   lints: ^5.0.0

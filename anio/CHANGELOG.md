@@ -1,3 +1,7 @@
+## 2.0.9
+
+- Make `FileHandleBase.openCount` protected.
+
 ## 2.0.8
 
 - Optimize `FileHandle`, `FileSource` and `FileSink`.
