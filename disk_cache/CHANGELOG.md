@@ -1,3 +1,7 @@
+## 1.0.15
+
+- update dependencies.
+
 ## 1.0.14
 
 - update dependencies.

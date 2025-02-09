@@ -1,3 +1,7 @@
+## 2.0.10
+
+- Update dependencies.
+
 ## 2.0.9
 
 - Make `FileHandleBase.openCount` protected.
